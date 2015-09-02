@@ -1,0 +1,5 @@
+{
+    "project": "@PROJECT_NAME@",
+    "version": "@VERSION@",
+    "commit": "@COMMIT@"
+}

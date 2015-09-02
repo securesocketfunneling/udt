@@ -1,0 +1,413 @@
+#ifndef UDT_CONNECTED_PROTOCOL_MULTIPLEXER_H_
+#define UDT_CONNECTED_PROTOCOL_MULTIPLEXER_H_
+
+#include <cstdint>
+
+#include <atomic>
+#include <map>
+#include <memory>
+
+#include <boost/asio/buffer.hpp>
+
+#include <boost/bind.hpp>
+#include <boost/chrono.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/optional.hpp>
+
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+
+#include <boost/system/error_code.hpp>
+
+#include "udt/common/error/error.h"
+
+#include "udt/connected_protocol/flow.h"
+#include "udt/connected_protocol/cache/connection_info.h"
+
+#include "udt/connected_protocol/logger/log_entry.h"
+
+namespace connected_protocol {
+
+template <class Protocol>
+class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
+ private:
+  enum { MAX_THREADS_IO_SERVICE_TIMER = 1 };
+
+ private:
+  typedef Protocol protocol_type;
+  typedef typename Protocol::logger Logger;
+  typedef typename protocol_type::next_layer_protocol::socket NextSocket;
+  typedef typename protocol_type::next_layer_protocol::endpoint NextEndpoint;
+  typedef std::shared_ptr<NextEndpoint> NextEndpointPtr;
+  typedef typename protocol_type::socket_session SocketSession;
+  typedef std::shared_ptr<SocketSession> SocketSessionPtr;
+  typedef typename protocol_type::acceptor_session AcceptorSession;
+  typedef std::shared_ptr<AcceptorSession> AcceptorSessionPtr;
+  typedef typename protocol_type::multiplexer_manager MultiplexerManager;
+
+ private:
+  typedef uint32_t SocketId;
+  typedef std::shared_ptr<Flow<Protocol>> FlowPtr;
+  typedef typename Flow<Protocol>::DatagramAddressPair DatagramAddressPair;
+
+ private:
+  typedef typename protocol_type::GenericReceiveDatagram GenericDatagram;
+  typedef std::shared_ptr<GenericDatagram> GenericDatagramPtr;
+  typedef typename protocol_type::ConnectionDatagram ConnectionDatagram;
+  typedef typename protocol_type::GenericControlDatagram ControlDatagram;
+  typedef std::shared_ptr<ControlDatagram> ControlDatagramPtr;
+  typedef typename protocol_type::DataDatagram DataDatagram;
+
+ private:
+  typedef std::map<NextEndpoint, FlowPtr> FlowsMap;
+  typedef std::map<SocketId, SocketSessionPtr> FlowSessionsMap;
+  typedef std::map<NextEndpoint, FlowSessionsMap> RemoteEndpointFlowMap;
+
+ public:
+  typedef std::shared_ptr<Multiplexer> Ptr;
+
+ public:
+  static Ptr Create(MultiplexerManager *p_manager, NextSocket socket) {
+    return Ptr(new Multiplexer(p_manager, std::move(socket)));
+  }
+
+  void Start() {
+    auto &timer_io_service = timer_io_service_;
+    for (uint16_t i = 1; i <= MAX_THREADS_IO_SERVICE_TIMER; ++i) {
+      timer_threads_.create_thread(
+          [&timer_io_service]() { timer_io_service.run(); });
+    }
+    running_ = true;
+    ReadPacket();
+  }
+
+  boost::asio::io_service &get_timer_io_service() { return timer_io_service_; }
+
+  boost::asio::io_service &get_io_service() { return socket_.get_io_service(); }
+
+  NextEndpoint local_endpoint(boost::system::error_code &ec) {
+    return socket_.local_endpoint(ec);
+  }
+
+  SocketSessionPtr CreateSocketSession(boost::system::error_code &ec,
+                                       const NextEndpoint &next_remote_endpoint,
+                                       SocketId user_socket_id = 0) {
+    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    SocketId id(0);
+    if (user_socket_id == 0) {
+      id = GenerateSocketId(next_remote_endpoint);
+    } else {
+      id = IsSocketIdAvailable(next_remote_endpoint, user_socket_id)
+               ? user_socket_id
+               : 0;
+    }
+
+    if (id == 0) {
+      ec.assign(::common::error::address_not_available,
+                ::common::error::get_error_category());
+      return nullptr;
+    }
+
+    SocketSessionPtr p_session(SocketSession::Create(
+        this->shared_from_this(), GetFlow(next_remote_endpoint)));
+
+    p_session->socket_id = id;
+    p_session->set_next_local_endpoint(local_endpoint(ec));
+    p_session->set_next_remote_endpoint(next_remote_endpoint);
+    remote_endpoint_flow_sessions_[next_remote_endpoint][id] = p_session;
+    return p_session;
+  }
+
+  void RemoveSocketSession(const NextEndpoint &next_remote_endpoint,
+                           SocketId socket_id = 0) {
+    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+
+    typename RemoteEndpointFlowMap::iterator r_ep_flow_it(
+        remote_endpoint_flow_sessions_.find(next_remote_endpoint));
+    if (r_ep_flow_it == remote_endpoint_flow_sessions_.end()) {
+      return;
+    }
+
+    r_ep_flow_it->second.erase(socket_id);
+    if (r_ep_flow_it->second.empty()) {
+      RemoveFlow(next_remote_endpoint);
+      remote_endpoint_flow_sessions_.erase(next_remote_endpoint);
+    }
+    if (remote_endpoint_flow_sessions_.empty() && !p_acceptor_) {
+      p_manager_->CleanMultiplexer(socket_.local_endpoint());
+    }
+  }
+
+  void SetAcceptor(boost::system::error_code &ec,
+                   AcceptorSessionPtr p_acceptor) {
+    if (p_acceptor_) {
+      ec.assign(::common::error::address_in_use,
+                ::common::error::get_error_category());
+      return;
+    }
+    p_acceptor_ = p_acceptor;
+
+    p_acceptor->set_p_multiplexer(this->shared_from_this());
+
+    ec.assign(::common::error::success, ::common::error::get_error_category());
+  }
+
+  void RemoveAcceptor() {
+    boost::recursive_mutex::scoped_lock lock_sessions(sessions_mutex_);
+    boost::recursive_mutex::scoped_lock lock_acceptor(acceptor_mutex_);
+    p_acceptor_.reset();
+
+    if (remote_endpoint_flow_sessions_.empty() && !p_acceptor_) {
+      p_manager_->CleanMultiplexer(socket_.local_endpoint());
+    }
+  }
+
+  // High priority sending : use for control packet only
+  template <class Datagram, class Handler>
+  void AsyncSendControlPacket(const Datagram &datagram,
+                              const NextEndpoint &next_endpoint,
+                              Handler handler) {
+    socket_.async_send_to(datagram.GetConstBuffers(), next_endpoint,
+                          std::move(handler));
+  }
+
+  template <class Datagram, class Handler>
+  void AsyncSendDataPacket(Datagram *p_datagram,
+                           const NextEndpoint &next_endpoint, Handler handler) {
+    if (p_datagram->is_acked()) {
+      this->get_io_service().post(
+          boost::asio::detail::binder2<decltype(handler),
+                                       boost::system::error_code, std::size_t>(
+              handler,
+              boost::system::error_code(::common::error::identifier_removed,
+                                        ::common::error::get_error_category()),
+              0));
+      return;
+    }
+    p_datagram->set_pending_send(true);
+    auto self = this->shared_from_this();
+    auto sent_handler = [p_datagram, handler, self](
+        const boost::system::error_code &sent_ec, std::size_t length) {
+      p_datagram->set_pending_send(false);
+      if (!sent_ec && Logger::ACTIVE) {
+        self->sent_count_ = self->sent_count_.load() + 1;
+      }
+      handler(sent_ec, length);
+    };
+    socket_.async_send_to(p_datagram->GetConstBuffers(), next_endpoint,
+                          std::move(sent_handler));
+  }
+
+  void Log(connected_protocol::logger::LogEntry *p_log) {
+    p_log->multiplexer_sent_count = sent_count_.load();
+  }
+
+  void ResetLog() { sent_count_ = 0; }
+
+  void Stop(boost::system::error_code &ec) {
+    running_ = false;
+    p_worker_.reset();
+    timer_threads_.join_all();
+    socket_.shutdown(boost::asio::socket_base::shutdown_both, ec);
+    socket_.close(ec);
+  }
+
+ private:
+  Multiplexer(MultiplexerManager *p_manager, NextSocket socket)
+      : p_manager_(p_manager),
+        socket_(std::move(socket)),
+        timer_io_service_(),
+        p_worker_(new boost::asio::io_service::work(timer_io_service_)),
+        running_(false),
+        flows_mutex_(),
+        flows_(),
+        sessions_mutex_(),
+        remote_endpoint_flow_sessions_(),
+        acceptor_mutex_(),
+        p_acceptor_(nullptr),
+        gen_(static_cast<uint32_t>(
+            boost::chrono::duration_cast<boost::chrono::nanoseconds>(
+                boost::chrono::high_resolution_clock::now().time_since_epoch())
+                .count())) {}
+
+  void ReadPacket() {
+    if (!running_.load() || !socket_.is_open()) {
+      return;
+    }
+    auto p_generic_packet = std::make_shared<GenericDatagram>();
+    auto p_next_remote_endpoint = std::make_shared<NextEndpoint>();
+    socket_.async_receive_from(
+        p_generic_packet->GetMutableBuffers(), *p_next_remote_endpoint,
+        boost::bind(&Multiplexer::HandlePacket, this->shared_from_this(),
+                    p_generic_packet, p_next_remote_endpoint, _1, _2));
+  }
+
+  void HandlePacket(GenericDatagramPtr p_generic_packet,
+                    NextEndpointPtr p_next_remote_endpoint,
+                    const boost::system::error_code &ec, std::size_t length) {
+    if (!running_.load()) {
+      return;
+    }
+
+    p_generic_packet->payload().SetSize(length - GenericDatagram::Header::size);
+
+    if (ec) {
+      ReadPacket();
+      return;
+    }
+
+    auto &header = p_generic_packet->header();
+    auto p_socket_session_optional(
+        GetSocketSession(*p_next_remote_endpoint, header.GetSocketId()));
+
+    if (header.IsDataPacket()) {
+      if (!p_socket_session_optional) {
+        // Drop datagram if no session found
+        ReadPacket();
+        return;
+      }
+
+      DataDatagram data_datagram;
+      boost::asio::buffer_copy(data_datagram.header().GetMutableBuffers(),
+                               p_generic_packet->header().GetConstBuffers());
+      auto &data_payload = data_datagram.payload();
+      auto &received_payload = p_generic_packet->payload();
+      data_payload = std::move(received_payload);
+      // Forward DataDatagram
+      (*p_socket_session_optional)->PushDataDgr(&data_datagram);
+      ReadPacket();
+      return;
+    }
+
+    if (header.IsControlPacket()) {
+      ReadPacket();
+      ControlDatagram control_datagram;
+      boost::asio::buffer_copy(control_datagram.GetMutableBuffers(),
+                               p_generic_packet->GetConstBuffers());
+      control_datagram.payload().SetSize(p_generic_packet->payload().GetSize());
+      if (control_datagram.header().IsType(
+              ControlDatagram::Header::CONNECTION)) {
+        auto p_connection_datagram = std::make_shared<ConnectionDatagram>();
+        boost::asio::buffer_copy(p_connection_datagram->GetMutableBuffers(),
+                                 control_datagram.GetConstBuffers());
+
+        if (p_socket_session_optional) {
+          (*p_socket_session_optional)
+              ->PushConnectionDgr(p_connection_datagram);
+          return;
+        }
+
+        {
+          boost::recursive_mutex::scoped_lock(acceptor_mutex_);
+          // Check if acceptor exists
+          if (p_acceptor_) {
+            p_acceptor_->PushConnectionDgr(p_connection_datagram,
+                                           p_next_remote_endpoint);
+            return;
+          }
+        }
+
+        // Drop connection datagram
+      } else {
+        if (!p_socket_session_optional) {
+          // Drop datagram
+          return;
+        }
+        // Forward ControlDatagram
+        (*p_socket_session_optional)->PushControlDgr(&control_datagram);
+      }
+    }
+  }
+
+  bool IsSocketIdAvailable(const NextEndpoint &next_remote_endpoint,
+                           SocketId socket_id) {
+    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    typename RemoteEndpointFlowMap::const_iterator r_ep_flow_it(
+        remote_endpoint_flow_sessions_.find(next_remote_endpoint));
+    if (r_ep_flow_it == remote_endpoint_flow_sessions_.end()) {
+      return true;
+    }
+
+    typename FlowSessionsMap::const_iterator session_it(
+        r_ep_flow_it->second.find(socket_id));
+    return session_it == r_ep_flow_it->second.end();
+  }
+
+  SocketId GenerateSocketId(const NextEndpoint &next_remote_endpoint) {
+    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    boost::random::uniform_int_distribution<uint32_t> dist(
+        1, std::numeric_limits<uint32_t>::max());
+    uint32_t rand_id;
+    for (int i = 0; i < 100; ++i) {
+      rand_id = dist(gen_);
+      if (IsSocketIdAvailable(next_remote_endpoint, rand_id)) {
+        return rand_id;
+      }
+    }
+
+    return 0;
+  }
+
+  boost::optional<SocketSessionPtr> GetSocketSession(
+      const NextEndpoint &next_remote_endpoint, SocketId socket_id) {
+    boost::recursive_mutex::scoped_lock lock_sessions(sessions_mutex_);
+    boost::optional<SocketSessionPtr> session_optional;
+
+    typename RemoteEndpointFlowMap::const_iterator r_ep_flow_it(
+        remote_endpoint_flow_sessions_.find(next_remote_endpoint));
+    if (r_ep_flow_it != remote_endpoint_flow_sessions_.end()) {
+      typename FlowSessionsMap::const_iterator session_it(
+          r_ep_flow_it->second.find(socket_id));
+      if (session_it != r_ep_flow_it->second.end()) {
+        session_optional.reset(session_it->second);
+      }
+    }
+
+    return session_optional;
+  }
+
+  FlowPtr GetFlow(const NextEndpoint &next_remote_endpoint) {
+    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+    typename FlowsMap::const_iterator flow_it(
+        flows_.find(next_remote_endpoint));
+    if (flow_it != flows_.end()) {
+      return flow_it->second;
+    }
+
+    FlowPtr p_flow(Flow<Protocol>::Create(timer_io_service_));
+    flows_[next_remote_endpoint] = p_flow;
+
+    return p_flow;
+  }
+
+  void RemoveFlow(const NextEndpoint &next_remote_endpoint) {
+    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+    typename FlowsMap::iterator flow_it(flows_.find(next_remote_endpoint));
+    if (flow_it == flows_.end()) {
+      return;
+    }
+
+    flows_.erase(flow_it);
+  }
+
+ private:
+  MultiplexerManager *p_manager_;
+  NextSocket socket_;
+  boost::asio::io_service timer_io_service_;
+  std::unique_ptr<boost::asio::io_service::work> p_worker_;
+  boost::thread_group timer_threads_;
+  std::atomic<bool> running_;
+  boost::recursive_mutex flows_mutex_;
+  FlowsMap flows_;
+  boost::recursive_mutex sessions_mutex_;
+  RemoteEndpointFlowMap remote_endpoint_flow_sessions_;
+  boost::recursive_mutex acceptor_mutex_;
+  AcceptorSessionPtr p_acceptor_;
+  boost::random::mt19937 gen_;
+  std::atomic<uint32_t> sent_count_;
+};
+
+}  // connected_protocol
+
+#endif  // UDT_CONNECTED_PROTOCOL_MULTIPLEXER_H_
