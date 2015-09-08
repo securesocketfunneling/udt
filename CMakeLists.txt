@@ -113,3 +113,4 @@ endif (BUILD_UNIT_TESTS)
 
 add_subdirectory("${project_SRC_DIR}/udt_client")
 add_subdirectory("${project_SRC_DIR}/udt_server")
+add_subdirectory("${project_SRC_DIR}/timer_benchmark")
