@@ -1,14 +1,13 @@
 #include <boost/asio/io_service.hpp>
+#include <boost/asio/write.hpp>
+#include <boost/asio/read.hpp>
 
 #include <boost/log/trivial.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
 
-#include <boost/asio/write.hpp>
-#include <boost/asio/read.hpp>
-
-#include "udt/ip/udt.h"
 #include "udt/connected_protocol/logger/file_log.h"
+#include "udt/ip/udt.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
@@ -38,7 +37,7 @@ int main(int argc, char* argv[]) {
   auto remote_endpoint_it = resolver.resolve(client_udt_query, resolve_ec);
 
   if (resolve_ec) {
-    BOOST_LOG_TRIVIAL(error) << "Wrong arguments provided" << std::endl;
+    BOOST_LOG_TRIVIAL(error) << "Wrong arguments provided";
     return 1;
   }
 
@@ -50,15 +49,18 @@ int main(int argc, char* argv[]) {
 
   connected = [&](const boost::system::error_code& ec) {
     if (!ec) {
-      BOOST_LOG_TRIVIAL(trace) << "Connected" << std::endl;
+      BOOST_LOG_TRIVIAL(trace) << "Connected";
       boost::asio::async_write(socket, boost::asio::buffer(buffer1),
                                sent_handler);
+    } else {
+      BOOST_LOG_TRIVIAL(trace) << "Error on connection : " << ec.value() << " "
+                               << ec.message();
     }
   };
 
   sent_handler = [&](const boost::system::error_code& ec, std::size_t length) {
     if (ec) {
-      BOOST_LOG_TRIVIAL(trace) << "sent ec : " << ec.value() << " "
+      BOOST_LOG_TRIVIAL(trace) << "Error on sent : " << ec.value() << " "
                                << ec.message();
       return;
     }

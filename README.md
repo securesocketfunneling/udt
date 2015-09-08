@@ -1,5 +1,40 @@
 # Boost asio UDT implementation
 
+This project is a an implementation of the [UDT protocol](http://udt.sourceforge.net)
+based on Boost asio components and philosophy (socket, timer, asynchronous model).
+
+## How to use
+
+The library complies with asio's API.
+
+As you would have used TCP socket :
+  * boost::asio::ip::tcp::socket
+  * boost::asio::ip::tcp::acceptor
+  * boost::asio::ip::tcp::resolver
+  * boost::asio::ip::tcp::resolver::query
+  
+The library provides UDT socket :
+  * ip::udt<>::socket
+  * ip::udt<>::acceptor
+  * ip::udt<>::resolver
+  * ip::udt<>::resolver::query
+  
+[UDT protocol](/src/udt/ip/udt.h) can be customized with template parameters :
+  * The first one is a Logger. By default there is no logging but it is possible
+  to use a FileLogger which log internal variables for statistics. A [python 
+  script](/tools/plot.py) is available to display logs as graphs.
+  * The second one is the congestion algorithm. By default, this is the standard 
+  congestion algorithm.
+
+At the moment, this library does not implement synchronous API and rendez-vous
+connection.
+
+Examples :
+  * [client](./src/udt_client/main.cpp)
+  * [server](./src/udt_server/main.cpp)
+
+Feel free to contribute, leave feedbacks or report issues !
+
 ## How to build
 
 ### Requirements
