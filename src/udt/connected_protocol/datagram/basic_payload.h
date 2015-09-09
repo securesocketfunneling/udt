@@ -431,7 +431,7 @@ class basic_NAckPayload {
 
   /// @param Size in bytes
   void SetSize(std::size_t new_size) {
-    int32_t vector_size = (uint32_t)ceil((double)new_size / 4);
+    uint32_t vector_size = (uint32_t)ceil((double)new_size / 4);
     if (vector_size <= MaxSize) {
       loss_packets_.resize(vector_size);
     } else {
