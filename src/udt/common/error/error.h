@@ -9,52 +9,63 @@ namespace common {
 namespace error {
 
 enum errors {
-  success = boost::system::errc::success,
-  interrupted = boost::system::errc::interrupted,
-  io_error = boost::system::errc::io_error,
-  bad_file_descriptor = boost::system::errc::bad_file_descriptor,
-  device_or_resource_busy = boost::system::errc::device_or_resource_busy,
-  invalid_argument = boost::system::errc::invalid_argument,
-  not_a_socket = boost::system::errc::not_a_socket,
-  broken_pipe = boost::system::errc::broken_pipe,
-  filename_too_long = boost::system::errc::filename_too_long,
-  message_too_long = boost::asio::error::basic_errors::message_size,
-  function_not_supported = boost::system::errc::function_not_supported,
-  connection_aborted = boost::system::errc::connection_aborted,
-  connection_refused = boost::system::errc::connection_refused,
-  connection_reset = boost::system::errc::connection_reset,
-  not_connected = boost::system::errc::not_connected,
-  protocol_error = boost::system::errc::protocol_error,
-  wrong_protocol_type = boost::system::errc::wrong_protocol_type,
-  operation_canceled = boost::system::errc::operation_canceled,
-  identifier_removed = boost::system::errc::identifier_removed,
   address_in_use = boost::system::errc::address_in_use,
   address_not_available = boost::system::errc::address_not_available,
-  destination_address_required =
-      boost::system::errc::destination_address_required,
   bad_address = boost::system::errc::bad_address,
-  message_size = boost::system::errc::message_size,
-  network_down = boost::system::errc::network_down,
-  no_buffer_space = boost::system::errc::no_buffer_space,
+  broken_pipe = boost::system::errc::broken_pipe,
+  buffer_is_full_error = 11000,
+  connection_aborted = boost::system::errc::connection_aborted,
+  device_or_resource_busy = boost::system::errc::device_or_resource_busy,
+  function_not_supported = boost::system::errc::function_not_supported,
+  identifier_removed = boost::system::errc::identifier_removed,
+  interrupted = boost::system::errc::interrupted,
+  io_error = boost::system::errc::io_error,
   no_link = boost::system::errc::no_link,
-  service_not_found = 10000,
-  out_of_range = 10001,
-  import_crt_error = 10002,
-  set_crt_error = 10003,
-  no_crt_error = 10004,
-  import_key_error = 10005,
-  set_key_error = 10006,
-  no_key_error = 10007,
-  no_dh_param_error = 10008,
-  buffer_is_full_error = 11000
+  not_connected = boost::system::errc::not_connected,
+  operation_canceled = boost::system::errc::operation_canceled,
+  success = boost::system::errc::success
 };
 
 namespace detail {
 class error_category : public boost::system::error_category {
  public:
-  const char* name() const BOOST_SYSTEM_NOEXCEPT;
+  const char* name() const BOOST_SYSTEM_NOEXCEPT { return "common error"; }
 
-  std::string message(int value) const;
+  std::string message(int value) const {
+    switch (value) {
+      case error::address_in_use:
+        return "address in use";
+      case error::address_not_available:
+        return "address not available";
+      case error::bad_address:
+        return "bad address";
+      case error::broken_pipe:
+        return "broken pipe";
+      case error::buffer_is_full_error:
+        return "buffer is full";
+      case error::connection_aborted:
+        return "connection aborted";
+      case error::device_or_resource_busy:
+        return "device or resource busy";
+      case error::function_not_supported:
+        return "function not supported";
+      case error::identifier_removed:
+        return "identifier removed";
+      case error::interrupted:
+        return "connection interrupted";
+      case error::io_error:
+        return "io_error";
+      case error::no_link:
+        return "no link";
+      case error::not_connected:
+        return "not connected";
+      case error::operation_canceled:
+        return "operation canceled";
+      case error::success:
+        return "success";
+    }
+    return "common error";
+  }
 };
 
 }  // detail
