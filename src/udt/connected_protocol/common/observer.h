@@ -5,15 +5,17 @@
 
 namespace connected_protocol {
 namespace common {
+
 template <class TSubject>
 class Observer {
  public:
-  typedef std::shared_ptr<Observer> Ptr;
-  typedef TSubject Subject;
+  using Ptr = std::shared_ptr<Observer>;
+  using Subject = TSubject;
 
  public:
   virtual void Notify(Subject*) = 0;
 };
+
 }  // common
 }  // connected_protocol
 

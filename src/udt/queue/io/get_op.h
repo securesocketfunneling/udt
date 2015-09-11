@@ -31,8 +31,8 @@ class basic_pending_get_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   }
 
  protected:
-  typedef void (*func_type)(basic_pending_get_operation*, bool,
-                            const boost::system::error_code&, T);
+  using func_type = void (*)(basic_pending_get_operation*, bool,
+                             const boost::system::error_code&, T);
 
   basic_pending_get_operation(func_type func) : next_(0), func_(func) {}
 

@@ -13,10 +13,10 @@ namespace io {
 template <class BufferType>
 class fixed_buffer_sequence {
  public:
-  typedef std::vector<BufferType> buffer_type;
-  typedef typename buffer_type::value_type value_type;
-  typedef typename buffer_type::iterator iterator;
-  typedef typename buffer_type::const_iterator const_iterator;
+  using buffer_type = std::vector<BufferType>;
+  using value_type = typename buffer_type::value_type;
+  using iterator = typename buffer_type::iterator;
+  using const_iterator = typename buffer_type::const_iterator;
 
   fixed_buffer_sequence() : buffers_() {}
 
@@ -41,11 +41,11 @@ class fixed_buffer_sequence {
   buffer_type buffers_;
 };
 
-typedef fixed_buffer_sequence<boost::asio::mutable_buffer>
-    fixed_mutable_buffer_sequence;
+using fixed_mutable_buffer_sequence =
+    fixed_buffer_sequence<boost::asio::mutable_buffer>;
 
-typedef fixed_buffer_sequence<boost::asio::const_buffer>
-    fixed_const_buffer_sequence;
+using fixed_const_buffer_sequence =
+    fixed_buffer_sequence<boost::asio::const_buffer>;
 
 }  // io
 }  // connected_protocol

@@ -8,8 +8,8 @@ namespace datagram {
 
 class EmptyComponent {
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
   enum { size = 0 };
 
  public:

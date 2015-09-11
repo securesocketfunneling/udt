@@ -12,13 +12,13 @@ namespace datagram {
 
 class basic_GenericHeader {
  private:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
 
-  typedef std::array<uint32_t, 4> data_type;
+  using DataType = std::array<uint32_t, 4>;
 
  public:
-  enum { size = sizeof(data_type) };
+  enum { size = sizeof(DataType) };
   enum { type_mask = 0x80000000 };
 
   basic_GenericHeader() {}
@@ -43,7 +43,7 @@ class basic_GenericHeader {
     p_buffers->push_back(boost::asio::buffer(data_));
   }
 
-  data_type &data() { return data_; }
+  DataType &data() { return data_; }
 
   bool IsControlPacket() { return ((ntohl(data_[0]) & type_mask) >> 31) == 1; }
 
@@ -54,13 +54,13 @@ class basic_GenericHeader {
   uint32_t GetSocketId() const { return ntohl(data_[3]); }
 
  private:
-  data_type data_;
+  DataType data_;
 };
 
 class basic_DataHeader {
  private:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
 
   struct Content {
     Content()
@@ -181,8 +181,8 @@ class basic_DataHeader {
 
 class basic_ControlHeader {
  private:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
 
  private:
   struct Content {

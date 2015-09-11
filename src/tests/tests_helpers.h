@@ -14,12 +14,12 @@
 
 namespace tests {
 struct helpers {
-  typedef std::function<void(const boost::system::error_code&, std::size_t)>
-      SendHandler;
-  typedef std::function<void(const boost::system::error_code&, std::size_t)>
-      ReceiveHandler;
-  typedef std::function<void(const boost::system::error_code&)> ConnectHandler;
-  typedef std::function<void(const boost::system::error_code&)> AcceptHandler;
+  using SendHandler =
+      std::function<void(const boost::system::error_code&, std::size_t)>;
+  using ReceiveHandler =
+      std::function<void(const boost::system::error_code&, std::size_t)>;
+  using ConnectHandler = std::function<void(const boost::system::error_code&)>;
+  using AcceptHandler = std::function<void(const boost::system::error_code&)>;
 
   template <class Buffer>
   static void ResetBuffer(Buffer* p_buffer, typename Buffer::value_type value,

@@ -13,11 +13,11 @@ namespace cache {
 
 class ConnectionInfo {
  public:
-  typedef std::shared_ptr<ConnectionInfo> Ptr;
+  using Ptr = std::shared_ptr<ConnectionInfo>;
 
  private:
-  typedef boost::chrono::high_resolution_clock clock;
-  typedef boost::chrono::time_point<clock> time_point;
+  using Clock = boost::chrono::high_resolution_clock;
+  using TimePoint = boost::chrono::time_point<Clock>;
 
  public:
   ConnectionInfo(long long syn_interval = 10000)
@@ -32,7 +32,7 @@ class ConnectionInfo {
         ack_period_(syn_interval),
         nack_period_(4 * syn_interval),
         exp_period_(500000),
-        last_update_(clock::now()) {}
+        last_update_(Clock::now()) {}
 
   ConnectionInfo& operator=(const ConnectionInfo& other) {
     syn_interval_ = other.syn_interval_.load();
@@ -46,7 +46,7 @@ class ConnectionInfo {
     ack_period_ = other.ack_period_.load();
     nack_period_ = other.nack_period_.load();
     exp_period_ = other.exp_period_.load();
-    last_update_ = clock::now();
+    last_update_ = Clock::now();
 
     return *this;
   }
@@ -63,7 +63,7 @@ class ConnectionInfo {
     ack_period_ = other.ack_period_.load();
     nack_period_ = other.nack_period_.load();
     exp_period_ = other.exp_period_.load();
-    last_update_ = clock::now();
+    last_update_ = Clock::now();
   }
 
   long long syn_interval() const { return syn_interval_; }
@@ -155,7 +155,7 @@ class ConnectionInfo {
 
   double window_flow_size() const { return window_flow_size_.load(); }
 
-  void UpdateTime() { last_update_ = clock::now(); }
+  void UpdateTime() { last_update_ = Clock::now(); }
 
   bool operator<(const ConnectionInfo& rhs) {
     return last_update_ < rhs.last_update_;
@@ -185,7 +185,7 @@ class ConnectionInfo {
   // exp period in microsec
   std::atomic<uint64_t> exp_period_;
   // update time
-  time_point last_update_;
+  TimePoint last_update_;
 };
 
 }  // congestion

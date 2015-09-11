@@ -15,13 +15,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  typedef ip::udt<> udt_protocol;
-  typedef std::array<uint8_t, 100000> Buffer;
-  typedef std::function<void(const boost::system::error_code&, std::size_t)>
-      SendHandler;
-  typedef std::function<void(const boost::system::error_code&, std::size_t)>
-      ReceiveHandler;
-  typedef std::function<void(const boost::system::error_code&)> ConnectHandler;
+  using udt_protocol = ip::udt<>;
+  using Buffer = std::array<uint8_t, 100000>;
+  using SendHandler =
+      std::function<void(const boost::system::error_code&, std::size_t)>;
+  using ReceiveHandler =
+      std::function<void(const boost::system::error_code&, std::size_t)>;
+  using ConnectHandler = std::function<void(const boost::system::error_code&)>;
 
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;

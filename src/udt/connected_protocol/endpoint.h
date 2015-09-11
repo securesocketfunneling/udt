@@ -8,11 +8,11 @@ namespace connected_protocol {
 template <class TProtocol>
 class Endpoint {
  public:
-  typedef TProtocol protocol_type;
-  typedef boost::asio::detail::socket_addr_type data_type;
-  typedef typename TProtocol::next_layer_protocol NextLayer;
-  typedef typename NextLayer::endpoint NextLayerEndpoint;
-  typedef uint32_t SocketId;
+  using protocol_type = TProtocol;
+  using data_type = boost::asio::detail::socket_addr_type;
+  using NextLayer = typename TProtocol::next_layer_protocol;
+  using NextLayerEndpoint = typename NextLayer::endpoint;
+  using SocketId = uint32_t;
 
  public:
   Endpoint() : socket_id_(0), next_layer_endpoint_() {}

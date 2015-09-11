@@ -20,10 +20,10 @@ namespace state {
 namespace connected {
 class AckHistoryWindow {
  public:
-  typedef uint32_t packet_sequence_number_type;
-  typedef uint32_t ack_sequence_number_type;
-  typedef boost::chrono::time_point<boost::chrono::high_resolution_clock>
-      high_resolution_time_point;
+  using PacketSequenceNumber = uint32_t;
+  using AckSequenceNumber = uint32_t;
+  using TimePoint =
+      boost::chrono::time_point<boost::chrono::high_resolution_clock>;
 
  public:
   AckHistoryWindow(uint32_t size = 1024)
@@ -34,8 +34,8 @@ class AckHistoryWindow {
         ack_sequence_numbers_(size),
         ack_timestamps_(size) {}
 
-  void StoreAck(ack_sequence_number_type ack_num,
-                packet_sequence_number_type packet_num) {
+  void StoreAck(AckSequenceNumber ack_num,
+                PacketSequenceNumber packet_num) {
     boost::mutex::scoped_lock lock(mutex_);
     uint32_t window_size = packet_sequence_numbers_.size();
     ack_sequence_numbers_[current_index_] = ack_num;
@@ -48,8 +48,8 @@ class AckHistoryWindow {
     }
   }
 
-  bool Acknowledge(ack_sequence_number_type ack_seq_num,
-                   packet_sequence_number_type* p_packet_seq_num,
+  bool Acknowledge(AckSequenceNumber ack_seq_num,
+                   PacketSequenceNumber* p_packet_seq_num,
                    boost::chrono::microseconds* p_rtt) {
     boost::mutex::scoped_lock lock(mutex_);
     uint32_t window_size = packet_sequence_numbers_.size();
@@ -103,9 +103,9 @@ class AckHistoryWindow {
   boost::mutex mutex_;
   uint32_t current_index_;
   uint32_t oldest_index_;
-  std::vector<packet_sequence_number_type> packet_sequence_numbers_;
-  std::vector<ack_sequence_number_type> ack_sequence_numbers_;
-  std::vector<high_resolution_time_point> ack_timestamps_;
+  std::vector<PacketSequenceNumber> packet_sequence_numbers_;
+  std::vector<AckSequenceNumber> ack_sequence_numbers_;
+  std::vector<TimePoint> ack_timestamps_;
 };
 
 }  // connected

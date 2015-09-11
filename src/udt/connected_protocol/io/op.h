@@ -30,7 +30,7 @@ class basic_pending_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   }
 
  protected:
-  typedef void (*func_type)(basic_pending_io_operation*, bool,
+  using func_type = void(*)(basic_pending_io_operation*, bool,
                             const boost::system::error_code& ec);
 
   basic_pending_io_operation(func_type func) : next_(0), func_(func) {}
@@ -61,9 +61,9 @@ class basic_pending_sized_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   }
 
  protected:
-  typedef void (*func_type)(basic_pending_sized_io_operation*, bool,
-                            const boost::system::error_code& ec,
-                            std::size_t length);
+  using func_type = void (*)(basic_pending_sized_io_operation*, bool,
+                             const boost::system::error_code& ec,
+                             std::size_t length);
 
   basic_pending_sized_io_operation(func_type func) : next_(0), func_(func) {}
 

@@ -29,10 +29,10 @@ namespace io {
 template <typename Protocol>
 class basic_pending_read_operation : public basic_pending_sized_io_operation {
  protected:
-  typedef typename Protocol::endpoint endpoint_type;
-  typedef std::size_t (*fill_buffer_func_type)(
-      basic_pending_read_operation*,
-      std::queue<typename Protocol::ReceiveDatagram>&);
+  using endpoint_type = typename Protocol::endpoint;
+  using fill_buffer_func_type =
+      std::size_t (*)(basic_pending_read_operation*,
+                      std::queue<typename Protocol::ReceiveDatagram>&);
 
  protected:
   /// Constructor
@@ -75,8 +75,8 @@ class basic_pending_read_operation : public basic_pending_sized_io_operation {
 template <class MutableBufferSequence, class Handler, class Protocol>
 class pending_read_operation : public basic_pending_read_operation<Protocol> {
  private:
-  typedef typename basic_pending_read_operation<Protocol>::endpoint_type
-      endpoint_type;
+  using endpoint_type =
+      typename basic_pending_read_operation<Protocol>::endpoint_type;
 
  public:
   BOOST_ASIO_DEFINE_HANDLER_PTR(pending_read_operation);
@@ -160,8 +160,8 @@ template <typename Protocol>
 class basic_pending_stream_read_operation
     : public basic_pending_sized_io_operation {
  protected:
-  typedef typename Protocol::endpoint endpoint_type;
-  typedef std::size_t (*fill_buffer_func_type)(
+  using endpoint_type = typename Protocol::endpoint;
+  using fill_buffer_func_type = std::size_t (*)(
       basic_pending_stream_read_operation*, fixed_const_buffer_sequence);
 
  protected:

@@ -25,10 +25,9 @@ namespace io {
 template <typename Protocol>
 class basic_pending_accept_operation : public basic_pending_io_operation {
  protected:
-  typedef boost::asio::basic_socket<typename Protocol::socket::protocol_type,
-                                    typename Protocol::socket::service_type>
-      socket_type;
-  typedef typename Protocol::endpoint endpoint_type;
+  using socket_type = boost::asio::basic_socket<typename Protocol::socket::protocol_type,
+                                    typename Protocol::socket::service_type>;
+  using endpoint_type = typename Protocol::endpoint;
 
  protected:
   /// Constructor
@@ -71,10 +70,10 @@ template <typename Handler, typename Protocol>
 class pending_accept_operation
     : public basic_pending_accept_operation<Protocol> {
  private:
-  typedef typename basic_pending_accept_operation<Protocol>::socket_type
-      socket_type;
-  typedef typename basic_pending_accept_operation<Protocol>::endpoint_type
-      endpoint_type;
+  using socket_type =
+      typename basic_pending_accept_operation<Protocol>::socket_type;
+  using endpoint_type =
+      typename basic_pending_accept_operation<Protocol>::endpoint_type;
 
  public:
   BOOST_ASIO_DEFINE_HANDLER_PTR(pending_accept_operation);

@@ -14,20 +14,20 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  typedef ip::udt<> udt_protocol;
-  typedef std::array<uint8_t, 150000> Buffer;
-  typedef std::shared_ptr<udt_protocol::socket> p_socket_type;
-  typedef std::function<void(const boost::system::error_code&, std::size_t,
-                             p_socket_type)> ReceiveHandler;
-  typedef std::function<void(const boost::system::error_code&, p_socket_type)>
-      AcceptHandler;
+  using udt_protocol = ip::udt<>;
+  using Buffer = std::array<uint8_t, 150000>;
+  using SocketPtr = std::shared_ptr<udt_protocol::socket>;
+  using ReceiveHandler = std::function<void(const boost::system::error_code&, std::size_t,
+                             SocketPtr)>;
+  using AcceptHandler = std::function<void(const boost::system::error_code&, SocketPtr)>
+     ;
 
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
 
   Buffer r_buffer2;
 
-  p_socket_type p_socket(std::make_shared<udt_protocol::socket>(io_service));
+  SocketPtr p_socket(std::make_shared<udt_protocol::socket>(io_service));
   udt_protocol::acceptor acceptor(io_service);
   udt_protocol::resolver resolver(io_service);
 
@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
   AcceptHandler accepted;
   ReceiveHandler received_handler;
 
-  accepted = [&](const boost::system::error_code& ec, p_socket_type p_socket) {
+  accepted = [&](const boost::system::error_code& ec, SocketPtr p_socket) {
     if (ec) {
       BOOST_LOG_TRIVIAL(trace) << "Error on accept : " << ec.value() << " "
                                << ec.message();
@@ -56,14 +56,14 @@ int main(int argc, char* argv[]) {
     boost::asio::async_read(*p_socket, boost::asio::buffer(r_buffer2),
                             boost::bind(received_handler, _1, _2, p_socket));
 
-    p_socket_type p_new_socket(
+    SocketPtr p_new_socket(
         std::make_shared<udt_protocol::socket>(io_service));
     acceptor.async_accept(*p_new_socket,
                           boost::bind(accepted, _1, p_new_socket));
   };
 
   received_handler = [&](const boost::system::error_code& ec,
-                         std::size_t length, p_socket_type p_socket) {
+                         std::size_t length, SocketPtr p_socket) {
     if (ec) {
       BOOST_LOG_TRIVIAL(trace) << "Error on receive ec : " << ec.value() << " "
                                << ec.message();

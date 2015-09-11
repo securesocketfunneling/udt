@@ -20,11 +20,11 @@ template <class Ttype, class Container = std::queue<Ttype>,
               Ttype, Container, QueueMaxSize, OPQueueMaxSize>>
 class basic_async_queue : public boost::asio::basic_io_object<Service> {
  private:
-  typedef typename std::remove_reference<Ttype>::type T;
+  using T = typename std::remove_reference<Ttype>::type;
 
  public:
-  typedef typename Service::value_type value_type;
-  typedef typename Service::container_type container_type;
+  using value_type = typename Service::value_type;
+  using container_type = typename Service::container_type;
   enum {
     kQueueMaxSize = Service::kQueueMaxSize,
     kOPQueueMaxSize = Service::kOPQueueMaxSize

@@ -19,8 +19,8 @@ namespace datagram {
 template <uint32_t MaxSize>
 class BufferPayload {
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
   enum { size = MaxSize };
 
  public:
@@ -69,8 +69,8 @@ class BufferPayload {
 template <uint64_t MaximumSize>
 class ConstBufferSequencePayload {
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef connected_protocol::io::basic_pending_write_operation SizedOp;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using SizedOp = connected_protocol::io::basic_pending_write_operation;
   enum { size = MaximumSize };
 
   ConstBufferSequencePayload()
@@ -127,8 +127,8 @@ class ConstBufferSequencePayload {
 
 class basic_ConnectionPayload {
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
 
  private:
   struct Content {
@@ -281,8 +281,8 @@ class basic_AckPayload {
   };
 
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
   enum { size = sizeof(Content) };
 
  public:
@@ -398,10 +398,10 @@ class basic_AckPayload {
 template <uint32_t MaxSize>
 class basic_NAckPayload {
  public:
-  typedef uint32_t packet_sequence_number_type;
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
-  typedef std::vector<packet_sequence_number_type> LossVector;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
+  using PacketSequenceNumber = uint32_t;
+  using LossVector = std::vector<PacketSequenceNumber>;
   enum { size = 0 };
 
  public:
@@ -431,7 +431,8 @@ class basic_NAckPayload {
 
   /// @param Size in bytes
   void SetSize(std::size_t new_size) {
-    uint32_t vector_size = (uint32_t)ceil((double)new_size / 4);
+    uint32_t vector_size =
+        static_cast<uint32_t>(ceil(static_cast<double>(new_size) / 4));
     if (vector_size <= MaxSize) {
       loss_packets_.resize(vector_size);
     } else {
@@ -441,12 +442,12 @@ class basic_NAckPayload {
 
   void ResetSize() { loss_packets_.resize(MaxSize); }
 
-  void AddLossPacket(packet_sequence_number_type packet_seq_num) {
+  void AddLossPacket(PacketSequenceNumber packet_seq_num) {
     loss_packets_.push_back(htonl(packet_seq_num & 0x7FFFFFFF));
   }
 
-  void AddLossRange(packet_sequence_number_type first_seq_num,
-                    packet_sequence_number_type last_seq_num) {
+  void AddLossRange(PacketSequenceNumber first_seq_num,
+                    PacketSequenceNumber last_seq_num) {
     loss_packets_.push_back(htonl(first_seq_num | 0x80000000));
     loss_packets_.push_back(htonl(last_seq_num & 0x7FFFFFFF));
   }
@@ -473,8 +474,8 @@ class basic_MessageDropRequestPayload {
   };
 
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
   enum { size = sizeof(Content) };
 
  public:

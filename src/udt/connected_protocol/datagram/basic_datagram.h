@@ -15,12 +15,14 @@ namespace datagram {
 template <class THeader, class TPayload>
 class basic_Datagram {
  public:
-  typedef THeader Header;
-  typedef TPayload Payload;
+  using Header = THeader;
+  using Payload = TPayload;
 
  public:
-  typedef io::fixed_const_buffer_sequence ConstBuffers;
-  typedef io::fixed_mutable_buffer_sequence MutableBuffers;
+  using ConstBuffers = io::fixed_const_buffer_sequence;
+  using MutableBuffers = io::fixed_mutable_buffer_sequence;
+
+ public:
   enum { size = Header::size + Payload::size };
 
  public:

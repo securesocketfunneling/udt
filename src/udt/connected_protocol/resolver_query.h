@@ -8,10 +8,10 @@ namespace connected_protocol {
 template <class Protocol>
 class ResolverQuery {
  public:
-  typedef Protocol protocol_type;
-  typedef uint32_t SocketId;
-  typedef typename Protocol::next_layer_protocol NextLayer;
-  typedef typename NextLayer::resolver::query NextLayerQuery;
+  using protocol_type = Protocol;
+  using SocketId = uint32_t;
+  using NextLayer = typename Protocol::next_layer_protocol;
+  using NextLayerQuery = typename NextLayer::resolver::query;
 
  public:
   ResolverQuery(const NextLayerQuery& next_layer_query, SocketId socket_id = 0)

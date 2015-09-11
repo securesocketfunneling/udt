@@ -16,21 +16,17 @@ namespace congestion {
 template <class Protocol>
 class CongestionControl {
  private:
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::time_point TimePoint;
+  using Clock = typename Protocol::clock;
+  using TimePoint = typename Protocol::time_point;
 
  public:
-  typedef connected_protocol::cache::ConnectionInfo ConnectionInfo;
-  typedef uint32_t packet_sequence_number_type;
-  typedef typename Protocol::socket_session SocketSession;
-  typedef typename Protocol::SendDatagram SendDatagram;
-  typedef std::shared_ptr<SendDatagram> SendDatagramPtr;
-  typedef typename Protocol::DataDatagram DataDatagram;
-  typedef std::shared_ptr<DataDatagram> DataDatagramPtr;
-  typedef typename Protocol::AckDatagram AckDatagram;
-  typedef std::shared_ptr<AckDatagram> AckDatagramPtr;
-  typedef typename Protocol::NAckDatagram NAckDatagram;
-  typedef std::shared_ptr<NAckDatagram> NAckDatagramPtr;
+  using ConnectionInfo = connected_protocol::cache::ConnectionInfo;
+  using PacketSequenceNumber = uint32_t;
+  using SocketSession = typename Protocol::socket_session;
+  using SendDatagram = typename Protocol::SendDatagram;
+  using DataDatagram = typename Protocol::DataDatagram;
+  using AckDatagram = typename Protocol::AckDatagram;
+  using NAckDatagram = typename Protocol::NAckDatagram;
 
   CongestionControl(ConnectionInfo *p_connection_info)
       : p_connection_info_(p_connection_info),
@@ -44,9 +40,11 @@ class CongestionControl {
         nack_count_(1),
         dec_count_(1),
         last_dec_sending_period_(1.0),
-        dec_random_(1) {}
+        last_send_seq_num_(0),
+        dec_random_(1),
+        last_update_(Clock::now()) {}
 
-  void Init(packet_sequence_number_type init_packet_seq_num,
+  void Init(PacketSequenceNumber init_packet_seq_num,
             uint32_t max_window_size) {
     last_dec_seq_num_ = init_packet_seq_num - 1;
     last_ack_number_ = init_packet_seq_num - 1;
@@ -58,13 +56,15 @@ class CongestionControl {
 
   void OnAck(const AckDatagram &ack_dgr,
              const SequenceGenerator &packet_seq_gen) {
-    double syn_interval = (double)p_connection_info_->syn_interval();
-    double rtt = (double)p_connection_info_->rtt().count();
-    double packet_data_size = (double)p_connection_info_->packet_data_size();
+    double syn_interval =
+        static_cast<double>(p_connection_info_->syn_interval());
+    double rtt = static_cast<double>(p_connection_info_->rtt().count());
+    double packet_data_size =
+        static_cast<double>(p_connection_info_->packet_data_size());
     double estimated_link_capacity =
         p_connection_info_->estimated_link_capacity();
     double packet_arrival_speed = p_connection_info_->packet_arrival_speed();
-    packet_sequence_number_type ack_number(
+    PacketSequenceNumber ack_number(
         GetSequenceNumber(ack_dgr.payload().max_packet_sequence_number()));
 
     TimePoint current_time = Clock::now();
@@ -80,7 +80,8 @@ class CongestionControl {
     if (slow_start_phase_.load()) {
       int32_t diff_length =
           packet_seq_gen.SeqLength(last_ack_number_.load(), ack_number);
-      window_flow_size_ = window_flow_size_.load() + ((double)diff_length);
+      window_flow_size_ =
+          window_flow_size_.load() + (static_cast<double>(diff_length));
       last_ack_number_ = ack_number;
       if (window_flow_size_.load() > max_window_size_) {
         slow_start_phase_ = false;
@@ -131,11 +132,11 @@ class CongestionControl {
   void OnLoss(const NAckDatagram &nack_dgr,
               const connected_protocol::SequenceGenerator &seq_gen) {
     std::vector<uint32_t> loss_list(nack_dgr.payload().GetLossPackets());
-    packet_sequence_number_type first_loss_list_seq =
-        GetSequenceNumber(loss_list[0]);
+    PacketSequenceNumber first_loss_list_seq = GetSequenceNumber(loss_list[0]);
 
-    double syn_interval = (double)p_connection_info_->syn_interval();
-    double rtt = (double)p_connection_info_->rtt().count();
+    double syn_interval =
+        static_cast<double>(p_connection_info_->syn_interval());
+    double rtt = static_cast<double>(p_connection_info_->rtt().count());
     double packet_arrival_speed = p_connection_info_->packet_arrival_speed();
 
     if (slow_start_phase_.load()) {
@@ -154,14 +155,14 @@ class CongestionControl {
       last_dec_sending_period_ = sending_period_.load();
       sending_period_ = sending_period_.load() * 1.125;
 
-      avg_nack_num_ = (uint32_t)ceil(avg_nack_num_.load() * 0.875 +
-                                     nack_count_.load() * 0.125);
+      avg_nack_num_ = static_cast<uint32_t>(
+          ceil(avg_nack_num_.load() * 0.875 + nack_count_.load() * 0.125));
       nack_count_ = 1;
       dec_count_ = 1;
       last_dec_seq_num_ = last_send_seq_num_.load();
       srand(last_dec_seq_num_.load());
-      dec_random_ =
-          (uint32_t)ceil(avg_nack_num_.load() * (double(rand()) / RAND_MAX));
+      dec_random_ = static_cast<uint32_t>(ceil(
+          avg_nack_num_.load() * (static_cast<double>(rand()) / RAND_MAX)));
       if (dec_random_ < 1) {
         dec_random_ = 1;
       }
@@ -182,13 +183,14 @@ class CongestionControl {
 
   void OnClose() {}
 
-  void UpdateLastSendSeqNum(packet_sequence_number_type last_send_seq_num) {
+  void UpdateLastSendSeqNum(PacketSequenceNumber last_send_seq_num) {
     last_send_seq_num_ = last_send_seq_num;
   }
 
   void UpdateWindowFlowSize() {
-    double syn_interval = (double)p_connection_info_->syn_interval();
-    double rtt = (double)p_connection_info_->rtt().count();
+    double syn_interval =
+        static_cast<double>(p_connection_info_->syn_interval());
+    double rtt = static_cast<double>(p_connection_info_->rtt().count());
     double packet_arrival_speed = p_connection_info_->packet_arrival_speed();
 
     window_flow_size_ =
@@ -199,16 +201,15 @@ class CongestionControl {
 
   boost::chrono::nanoseconds sending_period() const {
     return boost::chrono::nanoseconds(
-        (long long)ceil(sending_period_.load() * 1000));
+        static_cast<long long>(ceil(sending_period_.load() * 1000)));
   }
 
   uint32_t window_flow_size() const {
-    return (uint32_t)ceil(window_flow_size_.load());
+    return static_cast<uint32_t>(ceil(window_flow_size_.load()));
   }
 
  private:
-  packet_sequence_number_type GetSequenceNumber(
-      packet_sequence_number_type seq_num) {
+  PacketSequenceNumber GetSequenceNumber(PacketSequenceNumber seq_num) {
     return seq_num & 0x7FFFFFFF;
   }
 
@@ -220,14 +221,14 @@ class CongestionControl {
   std::atomic<double> sending_period_;
   std::atomic<bool> slow_start_phase_;
   std::atomic<bool> loss_phase_;
-  std::atomic<packet_sequence_number_type> last_ack_number_;
+  std::atomic<PacketSequenceNumber> last_ack_number_;
   std::atomic<uint32_t> avg_nack_num_;
   std::atomic<uint32_t> nack_count_;
   std::atomic<uint32_t> dec_count_;
-  std::atomic<packet_sequence_number_type> last_dec_seq_num_;
+  std::atomic<PacketSequenceNumber> last_dec_seq_num_;
   // in nanosec
   std::atomic<double> last_dec_sending_period_;
-  std::atomic<packet_sequence_number_type> last_send_seq_num_;
+  std::atomic<PacketSequenceNumber> last_send_seq_num_;
   std::atomic<uint32_t> dec_random_;
   TimePoint last_update_;
 };

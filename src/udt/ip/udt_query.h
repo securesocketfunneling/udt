@@ -15,10 +15,10 @@ namespace ip {
 template <class UDTProtocol>
 class UDTQuery : public connected_protocol::ResolverQuery<UDTProtocol> {
  public:
-  typedef UDTProtocol protocol_type;
-  typedef typename protocol_type::next_layer_protocol udp_protocol;
+  using protocol_type = UDTProtocol;
+  using udp_protocol = typename protocol_type::next_layer_protocol;
 
-  typedef uint32_t SocketId;
+  using SocketId = uint32_t;
 
   UDTQuery(const std::string& service,
            boost::asio::ip::resolver_query_base::flags resolve_flags =

@@ -24,12 +24,12 @@ class basic_async_queue_service
     : public boost::asio::detail::service_base<basic_async_queue_service<
           Ttype, TContainer, QueueMaxSize, OPQueueMaxSize>> {
  private:
-  typedef typename std::remove_reference<Ttype>::type T;
-  typedef typename std::remove_reference<TContainer>::type Container;
+  using T = typename std::remove_reference<Ttype>::type;
+  using Container = typename std::remove_reference<TContainer>::type;
 
  public:
-  typedef T value_type;
-  typedef Container container_type;
+  using value_type = T;
+  using container_type = Container;
   enum { kQueueMaxSize = QueueMaxSize, kOPQueueMaxSize = OPQueueMaxSize };
 
   struct implementation_type {
@@ -137,10 +137,10 @@ class basic_async_queue_service
                                            void(boost::system::error_code)>
         init(std::forward<Handler>(handler));
 
-    typedef queue::io::pending_push_operation<
+    using op = queue::io::pending_push_operation<
         typename ::boost::asio::handler_type<
             Handler, void(boost::system::error_code)>::type,
-        T> op;
+        T>;
     typename op::ptr p = {
         boost::asio::detail::addressof(init.handler),
         boost_asio_handler_alloc_helpers::allocate(sizeof(op), init.handler),
@@ -228,10 +228,10 @@ class basic_async_queue_service
                                            void(boost::system::error_code, T)>
         init(std::forward<Handler>(handler));
 
-    typedef queue::io::pending_get_operation<
+    using op = queue::io::pending_get_operation<
         typename ::boost::asio::handler_type<
             Handler, void(boost::system::error_code, T)>::type,
-        T> op;
+        T>;
     typename op::ptr p = {
         boost::asio::detail::addressof(init.handler),
         boost_asio_handler_alloc_helpers::allocate(sizeof(op), init.handler),

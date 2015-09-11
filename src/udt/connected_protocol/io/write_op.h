@@ -24,8 +24,8 @@ namespace io {
 
 class basic_pending_write_operation : public basic_pending_sized_io_operation {
  protected:
-  typedef io::fixed_const_buffer_sequence (*const_buffers_func_type)(
-      basic_pending_write_operation*);
+  using const_buffers_func_type =
+      io::fixed_const_buffer_sequence (*)(basic_pending_write_operation*);
 
  public:
   io::fixed_const_buffer_sequence const_buffers() {

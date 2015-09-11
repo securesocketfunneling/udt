@@ -13,7 +13,7 @@ namespace ip {
 template <class UDTProtocol>
 class UDTResolver : public connected_protocol::Resolver<UDTProtocol> {
  public:
-  typedef UDTQuery<UDTProtocol> query;
+  using query = UDTQuery<UDTProtocol>;
 
  public:
   UDTResolver(boost::asio::io_service& io_service)

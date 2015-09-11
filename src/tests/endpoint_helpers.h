@@ -6,7 +6,7 @@
 /// Test ASIO protocol requirements
 template <class AsioProtocol>
 void TestAsioEndpoint() {
-  typedef typename AsioProtocol::endpoint endpoint_type;
+  using endpoint_type = typename AsioProtocol::endpoint;
 
   endpoint_type ep1;
   endpoint_type ep2(ep1);

@@ -9,20 +9,19 @@
 
 #include <boost/thread.hpp>
 
-typedef boost::accumulators::accumulator_set<
+using Accumulator = boost::accumulators::accumulator_set<
     int, boost::accumulators::features<
              boost::accumulators::tag::min, boost::accumulators::tag::max,
-             boost::accumulators::tag::mean, boost::accumulators::tag::median>>
-    Accumulator;
+             boost::accumulators::tag::mean, boost::accumulators::tag::median>>;
 
 void DisplayStatistics(const Accumulator& statistics, int expected_wait);
 
 int main(int argc, char* argv[]) {
   namespace chrono = boost::chrono;
-  typedef chrono::high_resolution_clock Clock;
-  typedef boost::asio::basic_waitable_timer<Clock> ClockTimer;
-  typedef chrono::time_point<Clock> ClockTimePoint;
-  typedef std::function<void(const boost::system::error_code&)> TimerHandler;
+  using Clock = chrono::high_resolution_clock;
+  using ClockTimer = boost::asio::basic_waitable_timer<Clock>;
+  using ClockTimePoint = chrono::time_point<Clock>;
+  using TimerHandler = std::function<void(const boost::system::error_code&)>;
 
   if (argc < 3) {
     std::cout << "timer_benchmark [wait_usec] [sample_size]" << std::endl;

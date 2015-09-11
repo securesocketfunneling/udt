@@ -33,8 +33,8 @@ class basic_pending_push_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   T element() { return element_; }
 
  protected:
-  typedef void (*func_type)(basic_pending_push_operation*, bool,
-                            const boost::system::error_code&);
+  using func_type = void (*)(basic_pending_push_operation*, bool,
+                             const boost::system::error_code&);
 
   basic_pending_push_operation(func_type func, T element)
       : next_(0), func_(func), element_(std::move(element)) {}

@@ -52,14 +52,14 @@ class Resolver {
     std::size_t index_;
   };
 
-  typedef typename Protocol::next_layer_protocol NextLayer;
-  typedef typename NextLayer::endpoint NextLayerEndpoint;
+  using NextLayer = typename Protocol::next_layer_protocol;
+  using NextLayerEndpoint = typename NextLayer::endpoint;
 
  public:
-  typedef Protocol protocol_type;
-  typedef typename Protocol::endpoint endpoint_type;
-  typedef ResolverQuery<Protocol> query;
-  typedef EndpointIterator iterator;
+  using protocol_type = Protocol;
+  using endpoint_type = typename Protocol::endpoint;
+  using query = ResolverQuery<Protocol>;
+  using iterator = EndpointIterator;
 
  public:
   Resolver(boost::asio::io_service& io_service) : io_service_(io_service) {}

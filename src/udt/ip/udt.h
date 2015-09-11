@@ -17,13 +17,13 @@ template <class Logger = connected_protocol::logger::NoLog,
               connected_protocol::congestion::CongestionControl>
 class udt {
  public:
-  typedef connected_protocol::Protocol<boost::asio::ip::udp, Logger,
-                                       CongestionControlAlg> protocol_type;
+  using protocol_type = connected_protocol::Protocol<boost::asio::ip::udp, Logger,
+                                       CongestionControlAlg>;
 
-  typedef typename protocol_type::endpoint endpoint;
-  typedef typename protocol_type::socket socket;
-  typedef UDTResolver<protocol_type> resolver;
-  typedef typename protocol_type::acceptor acceptor;
+  using endpoint = typename protocol_type::endpoint;
+  using socket = typename protocol_type::socket;
+  using resolver = UDTResolver<protocol_type>;
+  using acceptor = typename protocol_type::acceptor;
 
   /// Obtain an identifier for the type of the protocol.
   int type() const { return BOOST_ASIO_OS_DEF(SOCK_STREAM); }
@@ -34,6 +34,7 @@ class udt {
   /// Obtain an identifier for the protocol family.
   int family() const { return BOOST_ASIO_OS_DEF(AF_INET); }
 };
+
 }  // ip
 
 #endif  // UDT_IP_UDT_H_

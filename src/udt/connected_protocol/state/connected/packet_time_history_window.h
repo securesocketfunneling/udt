@@ -17,10 +17,9 @@ namespace connected {
 
 class PacketTimeHistoryWindow {
  private:
-  typedef boost::chrono::time_point<boost::chrono::high_resolution_clock>
-      HighResolutionTimePoint;
-  typedef int_least64_t MicrosecUnit;
-  typedef boost::circular_buffer<MicrosecUnit> CircularBuffer;
+  using TimePoint = boost::chrono::time_point<boost::chrono::high_resolution_clock>;
+  using MicrosecUnit = int_least64_t;
+  using CircularBuffer = boost::circular_buffer<MicrosecUnit>;
 
  public:
   PacketTimeHistoryWindow(uint32_t max_arrival_size = 16,
@@ -50,7 +49,7 @@ class PacketTimeHistoryWindow {
 
   void OnArrival() {
     boost::mutex::scoped_lock lock_arrival(arrival_mutex_);
-    HighResolutionTimePoint arrival_time(
+    TimePoint arrival_time(
         boost::chrono::high_resolution_clock::now());
     MicrosecUnit delta(DeltaTime(arrival_time, last_arrival_));
     arrival_interval_history_.push_back(delta);
@@ -64,7 +63,7 @@ class PacketTimeHistoryWindow {
 
   void OnSecondProbe() {
     boost::mutex::scoped_lock lock_probe(probe_mutex_);
-    HighResolutionTimePoint arrival_time(
+    TimePoint arrival_time(
         boost::chrono::high_resolution_clock::now());
 
     probe_interval_history_.push_back(
@@ -129,8 +128,7 @@ class PacketTimeHistoryWindow {
   }
 
  private:
-  MicrosecUnit DeltaTime(const HighResolutionTimePoint &t1,
-                         const HighResolutionTimePoint &t2) {
+  MicrosecUnit DeltaTime(const TimePoint &t1, const TimePoint &t2) {
     return boost::chrono::duration_cast<boost::chrono::microseconds>(t1 - t2)
         .count();
   }
@@ -140,12 +138,12 @@ class PacketTimeHistoryWindow {
   boost::mutex arrival_mutex_;
   uint32_t max_packet_arrival_speed_size_;
   CircularBuffer arrival_interval_history_;
-  HighResolutionTimePoint last_arrival_;
+  TimePoint last_arrival_;
   // delta in micro seconds
   boost::mutex probe_mutex_;
   uint32_t max_probe_interval_size_;
   CircularBuffer probe_interval_history_;
-  HighResolutionTimePoint first_probe_arrival_;
+  TimePoint first_probe_arrival_;
 };
 
 }  // connected
