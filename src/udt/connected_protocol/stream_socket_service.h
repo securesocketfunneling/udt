@@ -5,6 +5,7 @@
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/socket_base.hpp>
+#include <boost/asio/use_future.hpp>
 
 #include "udt/common/error/error.h"
 
@@ -22,33 +23,31 @@ template <class Prococol>
 class stream_socket_service : public boost::asio::detail::service_base<
                                   stream_socket_service<Prococol>> {
  public:
-  typedef Prococol protocol_type;
+  using protocol_type = Prococol;
 
-  typedef std::shared_ptr<typename protocol_type::socket_session>
-      implementation_type;
+  struct implementation_type {
+    implementation_type()
+        : p_multiplexer(nullptr), p_session(nullptr), timeout(60) {}
 
-  typedef typename protocol_type::endpoint endpoint_type;
-  typedef std::shared_ptr<endpoint_type> p_endpoint_type;
-  typedef typename protocol_type::resolver resolver_type;
+    std::shared_ptr<typename protocol_type::multiplexer> p_multiplexer;
+    std::shared_ptr<typename protocol_type::socket_session> p_session;
+    int timeout;
+  };
 
-  typedef implementation_type& native_handle_type;
-  typedef native_handle_type native_type;
+  using endpoint_type = typename protocol_type::endpoint;
+
+  using native_handle_type = implementation_type&;
+  using native_type = native_handle_type;
 
  private:
-  typedef typename protocol_type::next_layer_protocol::socket next_socket_type;
-  typedef std::shared_ptr<next_socket_type> p_next_socket_type;
-  typedef
-      typename protocol_type::next_layer_protocol::endpoint next_endpoint_type;
-  typedef typename protocol_type::socket_session socket_session_type;
-  typedef std::shared_ptr<socket_session_type> p_socket_session_type;
-  typedef typename protocol_type::multiplexer multiplexer;
-  typedef std::shared_ptr<multiplexer> p_multiplexer_type;
-  typedef typename protocol_type::ShutdownDatagram shutdown_datagram_type;
+  using next_endpoint_type =
+      typename protocol_type::next_layer_protocol::endpoint;
+  using multiplexer = typename protocol_type::multiplexer;
 
-  typedef typename connected_protocol::state::ConnectingState<protocol_type>
-      ConnectingState;
-  typedef typename connected_protocol::state::ClosedState<protocol_type>
-      ClosedState;
+  using ConnectingState =
+      typename connected_protocol::state::ConnectingState<protocol_type>;
+  using ClosedState =
+      typename connected_protocol::state::ClosedState<protocol_type>;
 
  public:
   explicit stream_socket_service(boost::asio::io_service& io_service)
@@ -56,9 +55,15 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
   virtual ~stream_socket_service() {}
 
-  void construct(implementation_type& impl) { impl.reset(); }
+  void construct(implementation_type& impl) {
+    impl.p_session.reset();
+    impl.p_multiplexer.reset();
+  }
 
-  void destroy(implementation_type& impl) { impl.reset(); }
+  void destroy(implementation_type& impl) {
+    impl.p_session.reset();
+    impl.p_multiplexer.reset();
+  }
 
   void move_construct(implementation_type& impl, implementation_type& other) {
     impl = std::move(other);
@@ -85,16 +90,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
   }
 
   bool is_open(const implementation_type& impl) const {
-    return impl != nullptr;
+    return impl.p_multiplexer != nullptr || impl.p_session != nullptr;
   }
 
   endpoint_type remote_endpoint(const implementation_type& impl,
                                 boost::system::error_code& ec) const {
-    if (impl && impl->next_remote_endpoint() != next_endpoint_type()) {
+    if (impl.p_session &&
+        impl.p_session->next_remote_endpoint() != next_endpoint_type()) {
       ec.assign(::common::error::success,
                 ::common::error::get_error_category());
-      return endpoint_type(impl->remote_socket_id,
-                           impl->next_remote_endpoint());
+      return endpoint_type(impl.p_session->remote_socket_id(),
+                           impl.p_session->next_remote_endpoint());
     } else {
       ec.assign(::common::error::no_link,
                 ::common::error::get_error_category());
@@ -104,10 +110,12 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
   endpoint_type local_endpoint(const implementation_type& impl,
                                boost::system::error_code& ec) const {
-    if (impl && impl->next_local_endpoint() != next_endpoint_type()) {
+    if (impl.p_session &&
+        impl.p_session->next_local_endpoint() != next_endpoint_type()) {
       ec.assign(::common::error::success,
                 ::common::error::get_error_category());
-      return endpoint_type(impl->socket_id, impl->next_local_endpoint());
+      return endpoint_type(impl.p_session->socket_id(),
+                           impl.p_session->next_local_endpoint());
     } else {
       ec.assign(::common::error::no_link,
                 ::common::error::get_error_category());
@@ -117,11 +125,12 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
   boost::system::error_code close(implementation_type& impl,
                                   boost::system::error_code& ec) {
-    if (impl) {
-      impl->Close();
+    if (impl.p_session) {
+      impl.p_session->Close();
     }
 
-    impl.reset();
+    impl.p_session.reset();
+    impl.p_multiplexer.reset();
     ec.assign(::common::error::success, ::common::error::get_error_category());
     return ec;
   }
@@ -154,14 +163,14 @@ class stream_socket_service : public boost::asio::detail::service_base<
   boost::system::error_code bind(implementation_type& impl,
                                  const endpoint_type& local_endpoint,
                                  boost::system::error_code& ec) {
-    if (impl) {
+    if (impl.p_session || impl.p_multiplexer) {
       ec.assign(::common::error::device_or_resource_busy,
                 ::common::error::get_error_category());
-      return;
+      return ec;
     }
 
-    ec.assign(::common::error::function_not_supported,
-              ::common::error::get_error_category());
+    impl.p_multiplexer = protocol_type::multiplexers_manager_.GetMultiplexer(
+        this->get_io_service(), local_endpoint.next_layer_endpoint(), ec);
 
     return ec;
   }
@@ -169,10 +178,16 @@ class stream_socket_service : public boost::asio::detail::service_base<
   boost::system::error_code connect(implementation_type& impl,
                                     const endpoint_type& peer_endpoint,
                                     boost::system::error_code& ec) {
-    // todo : connect synchronously
-    ec.assign(::common::error::function_not_supported,
-              ::common::error::get_error_category());
-
+    try {
+      ec.clear();
+      auto future_value =
+          async_connect(impl, peer_endpoint, boost::asio::use_future);
+      future_value.get();
+      ec.assign(::common::error::success,
+                ::common::error::get_error_category());
+    } catch (const std::system_error& e) {
+      ec.assign(e.code().value(), ::common::error::get_error_category());
+    }
     return ec;
   }
 
@@ -186,18 +201,21 @@ class stream_socket_service : public boost::asio::detail::service_base<
         init(std::forward<ConnectHandler>(handler));
 
     boost::system::error_code ec;
-    p_multiplexer_type p_multiplexer =
-        protocol_type::multiplexers_manager_.CreateMultiplexer(
-            this->get_io_service(),
-            typename protocol_type::next_layer_protocol::endpoint(), ec);
+    if (!impl.p_multiplexer) {
+      impl.p_multiplexer = protocol_type::multiplexers_manager_.GetMultiplexer(
+          this->get_io_service(),
+          typename protocol_type::next_layer_protocol::endpoint(), ec);
 
-    if (ec) {
-      this->get_io_service().post(boost::asio::detail::binder1<
-          decltype(init.handler), boost::system::error_code>(init.handler, ec));
-      return init.result.get();
+      if (ec) {
+        this->get_io_service().post(
+            boost::asio::detail::binder1<decltype(init.handler),
+                                         boost::system::error_code>(
+                init.handler, ec));
+        return init.result.get();
+      }
     }
 
-    impl = p_multiplexer->CreateSocketSession(
+    impl.p_session = impl.p_multiplexer->CreateSocketSession(
         ec, peer_endpoint.next_layer_endpoint());
     if (ec) {
       this->get_io_service().post(boost::asio::detail::binder1<
@@ -205,20 +223,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    typedef io::pending_connect_operation<decltype(init.handler), protocol_type>
-        connect_op_type;
+    using connect_op_type =
+        io::pending_connect_operation<decltype(init.handler), protocol_type>;
     typename connect_op_type::ptr p = {
         boost::asio::detail::addressof(init.handler),
         boost_asio_handler_alloc_helpers::allocate(sizeof(connect_op_type),
                                                    init.handler),
         0};
 
-    // todo move op in state
     p.p = new (p.v) connect_op_type(init.handler);
-    impl->connection_op = p.p;
+    impl.p_session->ChangeState(ConnectingState::Create(impl.p_session, p.p));
     p.v = p.p = 0;
-
-    impl->ChangeState(ConnectingState::Create(impl));
 
     return init.result.get();
   }
@@ -228,9 +243,15 @@ class stream_socket_service : public boost::asio::detail::service_base<
   boost::system::error_code set_option(implementation_type& impl,
                                        const SettableSocketOption& option,
                                        boost::system::error_code& ec) {
+    if (!impl.p_session) {
+      impl.timeout = option.value();
+      ec.assign(::common::error::success,
+                ::common::error::get_error_category());
+      return ec;
+    }
+
     if (option.name(protocol_type::v4()) == protocol_type::TIMEOUT_DELAY) {
-      boost::recursive_mutex::scoped_lock lock(impl->mutex);
-      impl->timeout_delay = option.value();
+      impl.p_session->set_timeout_delay(option.value());
     }
 
     return ec;
@@ -252,11 +273,15 @@ class stream_socket_service : public boost::asio::detail::service_base<
                    const ConstBufferSequence& buffers,
                    boost::asio::socket_base::message_flags flags,
                    boost::system::error_code& ec) {
-    // todo : send synchronously
-    ec.assign(::common::error::function_not_supported,
-              ::common::error::get_error_category());
-
-    return ec;
+    try {
+      ec.clear();
+      auto future_value =
+          async_send(impl, buffers, flags, boost::asio::use_future);
+      return future_value.get();
+    } catch (const std::system_error& e) {
+      ec.assign(e.code().value(), ::common::error::get_error_category());
+      return 0;
+    }
   }
 
   template <typename ConstBufferSequence, typename WriteHandler>
@@ -269,7 +294,7 @@ class stream_socket_service : public boost::asio::detail::service_base<
         WriteHandler, void(boost::system::error_code, std::size_t)>
         init(std::forward<WriteHandler>(handler));
 
-    if (!impl) {
+    if (!impl.p_session) {
       this->get_io_service().post(
           boost::asio::detail::binder2<decltype(init.handler),
                                        boost::system::error_code, std::size_t>(
@@ -291,8 +316,8 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    typedef io::pending_write_operation<ConstBufferSequence,
-                                        decltype(init.handler)> write_op_type;
+    using write_op_type = io::pending_write_operation<ConstBufferSequence,
+                                                      decltype(init.handler)>;
     typename write_op_type::ptr p = {
         boost::asio::detail::addressof(init.handler),
         boost_asio_handler_alloc_helpers::allocate(sizeof(write_op_type),
@@ -301,7 +326,7 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
     p.p = new (p.v) write_op_type(buffers, std::move(init.handler));
 
-    impl->PushWriteOp(p.p);
+    impl.p_session->PushWriteOp(p.p);
 
     p.v = p.p = 0;
 
@@ -313,11 +338,15 @@ class stream_socket_service : public boost::asio::detail::service_base<
                       const MutableBufferSequence& buffers,
                       boost::asio::socket_base::message_flags flags,
                       boost::system::error_code& ec) {
-    // todo : receive synchronously
-    ec.assign(::common::error::function_not_supported,
-              ::common::error::get_error_category());
-
-    return ec;
+    try {
+      ec.clear();
+      auto future_value =
+          async_receive(impl, buffers, flags, boost::asio::use_future);
+      return future_value.get();
+    } catch (const std::system_error& e) {
+      ec.assign(e.code().value(), ::common::error::get_error_category());
+      return 0;
+    }
   }
 
   template <typename MutableBufferSequence, typename ReadHandler>
@@ -331,7 +360,7 @@ class stream_socket_service : public boost::asio::detail::service_base<
         ReadHandler, void(boost::system::error_code, std::size_t)>
         init(std::forward<ReadHandler>(handler));
 
-    if (!impl) {
+    if (!impl.p_session) {
       this->get_io_service().post(
           boost::asio::detail::binder2<decltype(init.handler),
                                        boost::system::error_code, std::size_t>(
@@ -353,9 +382,8 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    typedef io::pending_stream_read_operation<MutableBufferSequence,
-                                              decltype(init.handler),
-                                              protocol_type> read_op_type;
+    using read_op_type = io::pending_stream_read_operation<
+        MutableBufferSequence, decltype(init.handler), protocol_type>;
     typename read_op_type::ptr p = {
         boost::asio::detail::addressof(init.handler),
         boost_asio_handler_alloc_helpers::allocate(sizeof(read_op_type),
@@ -364,7 +392,7 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
     p.p = new (p.v) read_op_type(buffers, std::move(init.handler));
 
-    impl->PushReadOp(p.p);
+    impl.p_session->PushReadOp(p.p);
 
     p.v = p.p = 0;
 

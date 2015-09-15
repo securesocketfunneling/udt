@@ -10,12 +10,12 @@ namespace policy {
 template <class Protocol>
 class DropConnectionPolicy {
  private:
-  typedef typename Protocol::ConnectionDatagram ConnectionDatagram;
-  typedef std::shared_ptr<ConnectionDatagram> ConnectionDatagramPtr;
-  typedef typename Protocol::socket_session SocketSession;
+  using ConnectionDatagram = typename Protocol::ConnectionDatagram;
+  using ConnectionDatagramPtr = std::shared_ptr<ConnectionDatagram>;
+  using SocketSession = typename Protocol::socket_session;
 
  protected:
-  void ProcessConnectionDgr(typename SocketSession::Ptr p_session,
+  void ProcessConnectionDgr(SocketSession* p_session,
                             ConnectionDatagramPtr p_connection_dgr) {
     // Drop datagram
   }

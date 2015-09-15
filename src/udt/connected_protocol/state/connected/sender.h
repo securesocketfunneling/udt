@@ -26,33 +26,32 @@ namespace connected {
 template <class Protocol, class ConnectedState>
 class Sender {
  private:
-  typedef typename queue::basic_async_queue<io::basic_pending_write_operation *>
-      WriteOpsQueue;
-  typedef uint32_t PacketSequenceNumber;
+  using WriteOpsQueue =
+      typename queue::basic_async_queue<io::basic_pending_write_operation *>;
+  using PacketSequenceNumber = uint32_t;
 
  private:
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::timer Timer;
-  typedef typename Protocol::time_point TimePoint;
-  typedef typename Protocol::congestion_control CongestionControl;
-  typedef typename Protocol::socket_session SocketSession;
+  using Clock = typename Protocol::clock;
+  using Timer = typename Protocol::timer;
+  using TimePoint = typename Protocol::time_point;
+  using CongestionControl = typename Protocol::congestion_control;
+  using SocketSession = typename Protocol::socket_session;
 
  private:
-  typedef typename Protocol::SendDatagram SendDatagram;
-  typedef std::unique_ptr<SendDatagram> SendDatagramPtr;
-  typedef typename Protocol::NAckDatagram NAckDatagram;
-  typedef std::shared_ptr<NAckDatagram> NAckDatagramPtr;
-  typedef std::unordered_set<PacketSequenceNumber> LossPacketsSet;
-  typedef std::map<PacketSequenceNumber, SendDatagramPtr> NackPacketsMap;
+  using SendDatagram = typename Protocol::SendDatagram;
+  using SendDatagramPtr = std::unique_ptr<SendDatagram>;
+  using NAckDatagram = typename Protocol::NAckDatagram;
+  using NAckDatagramPtr = std::shared_ptr<NAckDatagram>;
+  using LossPacketsSet = std::unordered_set<PacketSequenceNumber>;
+  using NackPacketsMap = std::map<PacketSequenceNumber, SendDatagramPtr>;
 
  public:
-  Sender(boost::asio::io_service &io_service,
-         typename SocketSession::Ptr p_session)
+  Sender(typename SocketSession::Ptr p_session)
       : p_session_(p_session),
         p_state_(nullptr),
         max_send_size_(8192),
         write_ops_mutex_(),
-        write_ops_queue_(io_service),
+        write_ops_queue_(p_session->get_io_service()),
         unqueue_write_op_(false),
         loss_packets_mutex_(),
         loss_packets_(),
@@ -83,6 +82,11 @@ class Sender {
   }
 
   void UpdateLossListFromNackDgr(const NAckDatagram &nack_dgr) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     auto nack_loss_list = nack_dgr.payload().GetLossPackets();
     std::size_t loss_list_size = nack_loss_list.size();
 
@@ -97,7 +101,7 @@ class Sender {
               GetPacketSequenceValue(current_seq);
           ++i;
           if (i < loss_list_size && !IsInterval(nack_loss_list[i])) {
-            auto &packet_seq_gen = p_session_->packet_seq_gen;
+            const auto &packet_seq_gen = p_session->packet_seq_gen();
             PacketSequenceNumber second_range =
                 GetPacketSequenceValue(nack_loss_list[i]);
             PacketSequenceNumber j = first_range;
@@ -116,10 +120,15 @@ class Sender {
       }
     }
 
-    p_session_->p_flow->RegisterNewSocket(p_session_);
+    p_session->AsyncSendPackets();
   }
 
   void UpdateLossListFromNackPackets() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     {
       boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
       boost::mutex::scoped_lock lock_loss_packets(loss_packets_mutex_);
@@ -146,7 +155,7 @@ class Sender {
       }
     }
 
-    p_session_->p_flow->RegisterNewSocket(p_session_);
+    p_session->AsyncSendPackets();
   }
 
   bool HasLossPackets() {
@@ -166,11 +175,16 @@ class Sender {
   }
 
   SendDatagram *NextScheduledPacket() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return nullptr;
+    }
+
     TimePoint start_gen(Clock::now());
 
     SendDatagram *p_datagram(nullptr);
 
-    PacketSequenceNumber seq_num = p_session_->packet_seq_gen.current();
+    PacketSequenceNumber seq_num = p_session->packet_seq_gen().current();
 
     {
       boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
@@ -210,7 +224,7 @@ class Sender {
         if ((seq_num % 16 != 1) &&
             nack_packets_.size() >=
                 std::min(p_congestion_control_->window_flow_size(),
-                         p_session_->get_window_flow_size())) {
+                         p_session->window_flow_size())) {
           return nullptr;
         }
 
@@ -219,11 +233,11 @@ class Sender {
         // Update datagram metadata
         p_unique_datagram_ptr->header().set_timestamp((uint32_t)(
             boost::chrono::duration_cast<boost::chrono::microseconds>(
-                Clock::now() - p_session_->start_timestamp)
+                Clock::now() - p_session->start_timestamp())
                 .count()));
         p_unique_datagram_ptr->header().set_packet_sequence_number(seq_num);
         p_congestion_control_->UpdateLastSendSeqNum(seq_num);
-        p_session_->packet_seq_gen.Next();
+        p_session->get_p_packet_seq_gen()->Next();
         packets_to_send_.pop();
       }
     }
@@ -244,9 +258,14 @@ class Sender {
   }
 
   void AckPackets(PacketSequenceNumber seq_number) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     seq_number = GetPacketSequenceValue(seq_number);
 
-    auto &packet_seq_gen = p_session_->packet_seq_gen;
+    const auto &packet_seq_gen = p_session->packet_seq_gen();
 
     {
       boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
@@ -265,11 +284,16 @@ class Sender {
   }
 
   void PushWriteOp(io::basic_pending_write_operation *write_op) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::system::error_code ec;
     write_ops_queue_.push(write_op, ec);
     if (ec) {
       auto do_complete = [write_op, ec]() { write_op->complete(ec, 0); };
-      p_session_->get_io_service().post(do_complete);
+      p_session->get_io_service().post(do_complete);
     }
   }
 
@@ -299,6 +323,11 @@ class Sender {
   }
 
   void CloseWriteOpsQueue() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     // Unqueue write ops queue and callback with error code
     io::basic_pending_write_operation *p_write_op;
     boost::system::error_code ec;
@@ -312,7 +341,7 @@ class Sender {
                                      ::common::error::get_error_category());
         p_write_op->complete(ec, 0);
       };
-      p_session_->get_io_service().dispatch(std::move(do_complete));
+      p_session->get_io_service().dispatch(std::move(do_complete));
     }
     write_ops_queue_.close(ec);
   }
@@ -343,6 +372,11 @@ class Sender {
 
   void ProcessWriteOp(const boost::system::error_code &ec,
                       io::basic_pending_write_operation *p_write_op) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (ec) {
       // TODO error processing
       unqueue_write_op_ = false;
@@ -358,9 +392,9 @@ class Sender {
                                     ::common::error::get_error_category()),
           total_copy);
     };
-    p_session_->get_io_service().post(do_complete);
+    p_session->get_io_service().post(do_complete);
 
-    p_session_->p_flow->RegisterNewSocket(p_session_);
+    p_session->AsyncSendPackets();
 
     UnqueueWriteOp();
   }
@@ -368,11 +402,16 @@ class Sender {
   /// @return size of processed data
   std::size_t ProcessWriteOpBuffers(
       const io::fixed_const_buffer_sequence &write_buffers) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return 0;
+    }
+
     std::size_t copy_length(0);
     std::size_t packet_created(0);
     std::size_t total_copy(0);
     bool add_error(false);
-    uint32_t message_seq_number = p_session_->message_seq_gen.Next();
+    uint32_t message_seq_number = p_session->get_p_message_seq_gen()->Next();
 
     auto user_buf_current_it = boost::asio::buffers_begin(write_buffers);
 
@@ -387,7 +426,7 @@ class Sender {
       p_current_datagram = p_unique_current_datagram.get();
       auto &header = p_current_datagram->header();
       auto &payload = p_current_datagram->payload();
-      payload.SetSize(p_session_->connection_info.packet_data_size() -
+      payload.SetSize(p_session->connection_info().packet_data_size() -
                       SendDatagram::Header::size);
       auto payload_buf = payload.GetMutableBuffers();
       auto current_payload_it = boost::asio::buffers_begin(payload_buf);
@@ -405,7 +444,7 @@ class Sender {
       payload.SetSize(copy_length);
       // complete packet header
       header.set_message_number(message_seq_number);
-      header.set_destination_socket(p_session_->remote_socket_id);
+      header.set_destination_socket(p_session->remote_socket_id());
 
       add_error = !(AddPacket(std::move(p_unique_current_datagram)));
 
@@ -469,7 +508,7 @@ class Sender {
   }
 
  private:
-  typename SocketSession::Ptr p_session_;
+  std::weak_ptr<SocketSession> p_session_;
   typename ConnectedState::Ptr p_state_;
   uint32_t max_send_size_;
   boost::mutex write_ops_mutex_;

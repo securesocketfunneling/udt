@@ -17,14 +17,14 @@ namespace cache {
 template <class Protocol>
 class ConnectionsInfoManager {
  public:
-  typedef typename Protocol::next_layer_protocol::endpoint NextEndpoint;
+  using NextEndpoint = typename Protocol::next_layer_protocol::endpoint;
 
  private:
-  typedef std::string remote_address;
-  typedef std::map<remote_address, ConnectionInfo::Ptr> ConnectionsInfoMap;
+  using RemoteAddress = std::string;
+  using ConnectionsInfoMap = std::map<RemoteAddress, ConnectionInfo::Ptr>;
 
  public:
-  typedef typename Protocol::endpoint Endpoint;
+  using Endpoint = typename Protocol::endpoint;
 
  public:
   ConnectionsInfoManager(uint32_t max_cache_size = 64)
@@ -32,7 +32,7 @@ class ConnectionsInfoManager {
         connections_mutex_(),
         connections_info_() {}
 
-  ConnectionInfo::Ptr GetConnectionInfo(const NextEndpoint& next_endpoint) {
+  std::weak_ptr<ConnectionInfo> GetConnectionInfo(const NextEndpoint& next_endpoint) {
     boost::recursive_mutex::scoped_lock lock_connections(connections_mutex_);
     std::string address(next_endpoint.address().to_string());
     ConnectionsInfoMap::iterator connection_info_it(

@@ -25,6 +25,7 @@
 /// Test multiple connections on same acceptor
 template <class StreamProtocol>
 void TestMultipleConnections(
+    const typename StreamProtocol::resolver::query& client_local_query,
     const typename StreamProtocol::resolver::query& client_query,
     const typename StreamProtocol::resolver::query& acceptor_query,
     uint64_t max_connections) {
@@ -41,7 +42,7 @@ void TestMultipleConnections(
   typename StreamProtocol::resolver resolver(io_service);
 
   std::vector<typename StreamProtocol::socket> sockets;
-  for (int i = 0; i < 2 * max_connections; i++) {
+  for (int i = 0; i < 2 * max_connections; ++i) {
     sockets.emplace_back(io_service);
   }
 
@@ -57,6 +58,12 @@ void TestMultipleConnections(
       << "Resolving remote endpoint should not be in error: "
       << resolve_ec.message();
   typename StreamProtocol::endpoint remote_endpoint(*remote_endpoint_it);
+
+  auto local_endpoint_it = resolver.resolve(client_local_query, resolve_ec);
+  ASSERT_EQ(0, resolve_ec.value())
+      << "Resolving client local endpoint should not be in error: "
+      << resolve_ec.message();
+  typename StreamProtocol::endpoint local_endpoint(*local_endpoint_it);
 
   accepted = [&](const boost::system::error_code& ec) {
     ASSERT_EQ(0, ec.value())
@@ -108,6 +115,11 @@ void TestMultipleConnections(
             << " sockets to a single acceptor" << std::endl;
 
   for (int i = 0; i < 2 * max_connections; i = i + 2) {
+    boost::system::error_code bind_ec;
+    sockets[i].bind(local_endpoint, bind_ec);
+    ASSERT_EQ(0, ec.value())
+        << "Bind socket to local endpoint should not be in error: "
+        << ec.message();
     sockets[i].async_connect(remote_endpoint, connected);
   }
 
@@ -134,8 +146,8 @@ void TestStreamProtocol(
     const typename StreamProtocol::resolver::query& acceptor_query,
     uint64_t max_packets) {
   std::cout << ">>>> Stream Test" << std::endl;
-  typedef std::array<uint8_t, 165400> Buffer;
-  typedef std::array<uint8_t, 82700> HalfBuffer;
+  using Buffer = std::array<uint8_t, 165400>;
+  using HalfBuffer = std::array<uint8_t, 82700>;
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
 
@@ -180,7 +192,7 @@ void TestStreamProtocol(
   tests::helpers::ReceiveHandler received_handler2;
 
   accepted = [&](const boost::system::error_code& ec) {
-    std::cout << "Accepted" << std::endl;
+    std::cout << " * Accepted" << std::endl;
     ASSERT_EQ(0, ec.value())
         << "Accept handler should not be in error: " << ec.message();
 
@@ -198,7 +210,7 @@ void TestStreamProtocol(
   };
 
   connected = [&](const boost::system::error_code& ec) {
-    std::cout << "Connected" << std::endl;
+    std::cout << " * Connected" << std::endl;
     ASSERT_EQ(0, ec.value())
         << "Connect handler should not be in error: " << ec.message();
 
@@ -322,9 +334,9 @@ void TestStreamProtocol(
                            << ec.message();
   acceptor.async_accept(socket2, accepted);
 
-  std::cout << "Transfering " << buffer1.size() << " * " << max_packets << " = "
-            << buffer1.size() * max_packets << " bytes in both direction"
-            << std::endl;
+  std::cout << " * Transfering " << buffer1.size() << " * " << max_packets
+            << " = " << buffer1.size() * max_packets
+            << " bytes in both direction" << std::endl;
 
   socket1.async_connect(remote_endpoint, connected);
 
@@ -341,7 +353,7 @@ void TestStreamProtocolFuture(
     const typename StreamProtocol::resolver::query& client_query,
     const typename StreamProtocol::resolver::query& acceptor_query) {
   std::cout << ">>>> Future Test" << std::endl;
-  typedef std::array<uint8_t, 500> Buffer;
+  using Buffer = std::array<uint8_t, 500>;
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
   auto p_worker = std::unique_ptr<boost::asio::io_service::work>(
@@ -443,7 +455,7 @@ void TestStreamProtocolSpawn(
     const typename StreamProtocol::resolver::query& client_query,
     const typename StreamProtocol::resolver::query& acceptor_query) {
   std::cout << ">>>> Spawn Test" << std::endl;
-  typedef std::array<uint8_t, 500> Buffer;
+  using Buffer = std::array<uint8_t, 500>;
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
 
@@ -529,7 +541,8 @@ template <class StreamProtocol>
 void TestStreamProtocolSynchronous(
     const typename StreamProtocol::resolver::query& client_query,
     const typename StreamProtocol::resolver::query& acceptor_query) {
-  typedef std::array<uint8_t, 500> Buffer;
+  std::cout << ">>>> Synchronous Test" << std::endl;
+  using Buffer = std::array<uint8_t, 500>;
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
   auto p_worker = std::unique_ptr<boost::asio::io_service::work>(

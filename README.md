@@ -24,10 +24,9 @@ The library provides UDT socket :
   to use a FileLogger which log internal variables for statistics. A [python 
   script](/tools/plot.py) is available to display logs as graphs.
   * The second one is the congestion algorithm. By default, this is the standard 
-  congestion algorithm.
+  congestion algorithm. Feel free to suggest and implement your own algorithm.
 
-At the moment, this library does not implement synchronous API and rendez-vous
-connection.
+At the moment, this library does not support the rendez-vous connection feature.
 
 Examples :
   * [client](./src/udt_client/main.cpp)
@@ -35,7 +34,7 @@ Examples :
 
 Feel free to contribute, leave feedbacks or report issues !
 
-## How to build
+## How to build examples (client, server) or unit tests
 
 ### Requirements
 
@@ -61,24 +60,24 @@ cp boost_1_XX_Y.tar.bz2 PROJECT_PATH/third_party/boost
 
 * CopyCopy [GTest archive](http://code.google.com/p/googletest/downloads/list) in ``third_party/gtest``
 
- ```bash
- cp gtest-1.X.Y.zip PROJECT_PATH/third_party/gtest
- ```
+```bash
+cp gtest-1.X.Y.zip PROJECT_PATH/third_party/gtest
+```
 
 * Generate project
 
- ```bash
- mkdir PROJECT_PATH/build
- cd PROJECT_PATH/build
- cmake -G "GENERATOR" ../
- ```
+```bash
+mkdir PROJECT_PATH/build
+cd PROJECT_PATH/build
+cmake ../
+```
 
- * Build project
+* Build project
 
- ```bash
- cd PROJECT_PATH/build
- cmake --build . --config Debug|Release
- ```
+```bash
+cd PROJECT_PATH/build
+cmake --build . --config Debug|Release
+```
 
 ### Build test executables on Linux
 
@@ -105,7 +104,7 @@ cp gtest-1.X.Y.zip PROJECT_PATH/third_party/gtest
 ```bash
 mkdir PROJECT_PATH/build
 cd PROJECT_PATH/build
-cmake -G "GENERATOR" -DCMAKE_BUILD_TYPE=Release|Debug ../
+cmake -DCMAKE_BUILD_TYPE=Release|Debug ../
 ```
 
 * Build project

@@ -17,18 +17,15 @@ namespace state {
 template <class Protocol>
 class BaseState {
  public:
-  typedef std::shared_ptr<BaseState> Ptr;
-  typedef typename Protocol::ConnectionDatagram ConnectionDatagram;
-  typedef std::shared_ptr<ConnectionDatagram> ConnectionDatagramPtr;
-  typedef typename Protocol::GenericControlDatagram ControlDatagram;
-  typedef std::shared_ptr<ControlDatagram> ControlDatagramPtr;
-  typedef typename Protocol::SendDatagram SendDatagram;
-  typedef std::shared_ptr<SendDatagram> SendDatagramPtr;
-  typedef typename Protocol::DataDatagram DataDatagram;
-  typedef std::shared_ptr<DataDatagram> DataDatagramPtr;
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::time_point TimePoint;
-  typedef typename Protocol::timer Timer;
+  using Ptr = std::shared_ptr<BaseState>;
+  using ConnectionDatagram = typename Protocol::ConnectionDatagram;
+  using ConnectionDatagramPtr = std::shared_ptr<ConnectionDatagram>;
+  using ControlDatagram = typename Protocol::GenericControlDatagram;
+  using SendDatagram = typename Protocol::SendDatagram;
+  using DataDatagram = typename Protocol::DataDatagram;
+  using Clock = typename Protocol::clock;
+  using TimePoint = typename Protocol::time_point;
+  using Timer = typename Protocol::timer;
 
  public:
   enum type { CLOSED, CONNECTING, ACCEPTING, CONNECTED, TIMEOUT };
@@ -36,7 +33,7 @@ class BaseState {
  public:
   virtual type GetType() = 0;
 
-  virtual boost::asio::io_service& get_io_service() = 0;
+  boost::asio::io_service& get_io_service() { return io_service_; }
 
   virtual void Init() {}
 
@@ -55,7 +52,7 @@ class BaseState {
                                     ::common::error::get_error_category()),
           0);
     };
-    this->get_io_service().post(do_complete);
+    io_service_.post(do_complete);
   }
 
   virtual void PushWriteOp(io::basic_pending_write_operation* write_op) {
@@ -66,7 +63,7 @@ class BaseState {
                                     ::common::error::get_error_category()),
           0);
     };
-    this->get_io_service().post(do_complete);
+    io_service_.post(do_complete);
   }
 
   virtual bool HasPacketToSend() { return false; }
@@ -96,6 +93,12 @@ class BaseState {
   virtual boost::chrono::nanoseconds NextScheduledPacketTime() {
     return boost::chrono::nanoseconds(0);
   }
+
+ protected:
+  BaseState(boost::asio::io_service& io_service) : io_service_(io_service) {}
+
+ private:
+  boost::asio::io_service& io_service_;
 };
 
 }  // state

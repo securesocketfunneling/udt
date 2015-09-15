@@ -22,9 +22,9 @@ namespace connected_protocol {
 template <class Protocol>
 class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
  public:
-  typedef typename Protocol::next_layer_protocol::endpoint NextEndpointType;
-  typedef typename Protocol::SendDatagram Datagram;
-  typedef std::shared_ptr<Datagram> DatagramPtr;
+  using NextEndpointType = typename Protocol::next_layer_protocol::endpoint;
+  using Datagram = typename Protocol::SendDatagram;
+  using DatagramPtr = std::shared_ptr<Datagram>;
 
   struct DatagramAddressPair {
     DatagramPtr p_datagram;
@@ -32,35 +32,47 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
   };
 
  private:
-  typedef typename Protocol::timer Timer;
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::time_point TimePoint;
-  typedef typename Protocol::logger Logger;
-  typedef typename Protocol::socket_session SocketSession;
+  using Timer = typename Protocol::timer;
+  using Clock = typename Protocol::clock;
+  using TimePoint = typename Protocol::time_point;
+  using Logger = typename Protocol::logger;
+  using SocketSession = typename Protocol::socket_session;
 
   struct CompareSessionPacketSendingTime {
-    bool operator()(typename SocketSession::Ptr p_lhs,
-                    typename SocketSession::Ptr p_rhs) {
-      return p_lhs->NextScheduledPacketTime() <
-             p_rhs->NextScheduledPacketTime();
+    bool operator()(std::weak_ptr<SocketSession> p_lhs,
+                    std::weak_ptr<SocketSession> p_rhs) {
+      auto p_shared_lhs = p_lhs.lock();
+      auto p_shared_rhs = p_rhs.lock();
+      if (!p_shared_lhs || !p_shared_rhs) {
+        return true;
+      }
+
+      return p_shared_lhs->NextScheduledPacketTime() <
+             p_shared_rhs->NextScheduledPacketTime();
     }
   };
 
-  typedef std::set<typename SocketSession::Ptr, CompareSessionPacketSendingTime>
-      SocketsContainer;
+  using SocketsContainer =
+      std::set<std::weak_ptr<SocketSession>, CompareSessionPacketSendingTime>;
 
  public:
-  typedef std::shared_ptr<Flow> Ptr;
+  using Ptr = std::shared_ptr<Flow>;
 
  public:
   static Ptr Create(boost::asio::io_service& io_service) {
     return Ptr(new Flow(io_service));
   }
 
+  ~Flow() {}
+
   void RegisterNewSocket(typename SocketSession::Ptr p_session) {
     {
-      boost::mutex::scoped_lock lock(mutex_);
-      socket_sessions_.insert(p_session);
+      boost::recursive_mutex::scoped_lock lock(mutex_);
+      auto inserted = socket_sessions_.insert(p_session);
+      if (inserted.second) {
+        // relaunch timer since there is a new socket
+        StopPullSocketQueue();
+      }
     }
 
     StartPullingSocketQueue();
@@ -78,7 +90,8 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
         mutex_(),
         socket_sessions_(),
         next_packet_timer_(io_service),
-        pulling_(false) {}
+        pulling_(false),
+        sent_count_(0) {}
 
   void StartPullingSocketQueue() {
     if (pulling_.load()) {
@@ -96,7 +109,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
     }
 
     {
-      boost::mutex::scoped_lock lock_socket_sessions(mutex_);
+      boost::recursive_mutex::scoped_lock lock_socket_sessions(mutex_);
       if (socket_sessions_.empty()) {
         this->StopPullSocketQueue();
         return;
@@ -104,8 +117,15 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
       p_next_socket_expired_it = socket_sessions_.begin();
 
+      auto p_next_socket_expired = (*p_next_socket_expired_it).lock();
+      if (!p_next_socket_expired) {
+        io_service_.post(
+            boost::bind(&Flow::PullSocketQueue, this->shared_from_this()));
+        return;
+      }
+
       auto next_scheduled_packet_interval =
-          (*p_next_socket_expired_it)->NextScheduledPacketTime();
+          p_next_socket_expired->NextScheduledPacketTime();
 
       if (next_scheduled_packet_interval.count() <= 0) {
         // Resend immediatly
@@ -132,7 +152,6 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
   void WaitPullSocketHandler(const boost::system::error_code& ec) {
     if (ec) {
-      BOOST_LOG_TRIVIAL(trace) << "Error on pull flow";
       StopPullSocketQueue();
       return;
     }
@@ -140,7 +159,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
     typename SocketSession::Ptr p_session;
     Datagram* p_datagram;
     {
-      boost::mutex::scoped_lock lock_socket_sessions(mutex_);
+      boost::recursive_mutex::scoped_lock lock_socket_sessions(mutex_);
 
       if (socket_sessions_.empty()) {
         StopPullSocketQueue();
@@ -149,9 +168,15 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
       typename SocketsContainer::iterator p_session_it;
       p_session_it = socket_sessions_.begin();
-      p_session = *p_session_it;
-      socket_sessions_.erase(p_session_it);
 
+      p_session = (*p_session_it).lock();
+
+      if (!p_session) {
+        socket_sessions_.erase(p_session_it);
+        PullSocketQueue();
+        return;
+      }
+      socket_sessions_.erase(p_session_it);
       p_datagram = p_session->NextScheduledPacket();
 
       if (p_session->HasPacketToSend()) {
@@ -175,15 +200,12 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
  private:
   boost::asio::io_service& io_service_;
 
-  boost::mutex mutex_;
-
+  boost::recursive_mutex mutex_;
   // sockets list
   SocketsContainer socket_sessions_;
 
   Timer next_packet_timer_;
-
   std::atomic<bool> pulling_;
-
   std::atomic<uint32_t> sent_count_;
 };
 

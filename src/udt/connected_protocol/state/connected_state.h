@@ -27,70 +27,68 @@ class ConnectedState : public BaseState<Protocol>,
                            ConnectedState<Protocol, ConnectionPolicy>>,
                        public ConnectionPolicy {
  public:
-  typedef std::shared_ptr<ConnectedState> Ptr;
+  using Ptr = std::shared_ptr<ConnectedState>;
 
  private:
-  typedef typename Protocol::congestion_control CongestionControl;
-  typedef typename Protocol::socket_session SocketSession;
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::timer Timer;
-  typedef typename Protocol::time_point TimePoint;
-  typedef typename Protocol::logger Logger;
+  using CongestionControl = typename Protocol::congestion_control;
+  using SocketSession = typename Protocol::socket_session;
+  using Clock = typename Protocol::clock;
+  using Timer = typename Protocol::timer;
+  using TimePoint = typename Protocol::time_point;
+  using Logger = typename Protocol::logger;
 
  private:
-  typedef typename Protocol::SendDatagram SendDatagram;
-  typedef std::shared_ptr<SendDatagram> SendDatagramPtr;
-  typedef typename Protocol::DataDatagram DataDatagram;
-  typedef std::shared_ptr<DataDatagram> DataDatagramPtr;
-  typedef typename Protocol::ConnectionDatagram ConnectionDatagram;
-  typedef std::shared_ptr<ConnectionDatagram> ConnectionDatagramPtr;
-  typedef typename Protocol::GenericControlDatagram ControlDatagram;
-  typedef std::shared_ptr<ControlDatagram> ControlDatagramPtr;
-  typedef typename Protocol::AckDatagram AckDatagram;
-  typedef std::shared_ptr<AckDatagram> AckDatagramPtr;
-  typedef typename Protocol::NAckDatagram NAckDatagram;
-  typedef std::shared_ptr<NAckDatagram> NAckDatagramPtr;
-  typedef typename Protocol::AckOfAckDatagram AckOfAckDatagram;
-  typedef std::shared_ptr<AckOfAckDatagram> AckOfAckDatagramPtr;
-  typedef typename Protocol::KeepAliveDatagram KeepAliveDatagram;
-  typedef std::shared_ptr<KeepAliveDatagram> KeepAliveDatagramPtr;
-  typedef typename Protocol::ShutdownDatagram ShutdownDatagram;
-  typedef std::shared_ptr<ShutdownDatagram> ShutdownDatagramPtr;
+  using SendDatagram = typename Protocol::SendDatagram;
+  using DataDatagram = typename Protocol::DataDatagram;
+  using ConnectionDatagram = typename Protocol::ConnectionDatagram;
+  using ConnectionDatagramPtr = std::shared_ptr<ConnectionDatagram>;
+  using ControlDatagram = typename Protocol::GenericControlDatagram;
+  using AckDatagram = typename Protocol::AckDatagram;
+  using AckDatagramPtr = std::shared_ptr<AckDatagram>;
+  using NAckDatagram = typename Protocol::NAckDatagram;
+  using NAckDatagramPtr = std::shared_ptr<NAckDatagram>;
+  using AckOfAckDatagram = typename Protocol::AckOfAckDatagram;
+  using AckOfAckDatagramPtr = std::shared_ptr<AckOfAckDatagram>;
+  using KeepAliveDatagram = typename Protocol::KeepAliveDatagram;
+  using KeepAliveDatagramPtr = std::shared_ptr<KeepAliveDatagram>;
+  using ShutdownDatagram = typename Protocol::ShutdownDatagram;
+  using ShutdownDatagramPtr = std::shared_ptr<ShutdownDatagram>;
 
  private:
-  typedef typename state::ClosedState<Protocol> ClosedState;
-  typedef typename connected::Sender<Protocol, ConnectedState> Sender;
-  typedef typename connected::Receiver<Protocol> Receiver;
+  using ClosedState = typename state::ClosedState<Protocol>;
+  using Sender = typename connected::Sender<Protocol, ConnectedState>;
+  using Receiver = typename connected::Receiver<Protocol>;
 
  private:
-  typedef uint32_t PacketSequenceNumber;
-  typedef uint32_t AckSequenceNumber;
+  using PacketSequenceNumber = uint32_t;
+  using AckSequenceNumber = uint32_t;
 
  public:
   static Ptr Create(typename SocketSession::Ptr p_session) {
     return Ptr(new ConnectedState(std::move(p_session)));
   }
 
-  virtual ~ConnectedState() { StopServices(); }
+  virtual ~ConnectedState() {}
 
   virtual typename BaseState<Protocol>::type GetType() {
     return this->CONNECTED;
   }
 
-  virtual boost::asio::io_service& get_io_service() {
-    return p_session_->get_io_service();
-  }
-
   virtual void Init() {
-    receiver_.Init(p_session_->init_packet_seq_num);
-    sender_.Init(this->shared_from_this(), &congestion_control_);
-    congestion_control_.Init(p_session_->init_packet_seq_num,
-                             p_session_->max_window_flow_size);
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
 
-    ack_timer_.expires_from_now(p_session_->connection_info.ack_period());
+    receiver_.Init(p_session->init_packet_seq_num());
+    sender_.Init(this->shared_from_this(), &congestion_control_);
+    congestion_control_.Init(p_session->init_packet_seq_num(),
+                             p_session->max_window_flow_size());
+
+    ack_timer_.expires_from_now(p_session->connection_info().ack_period());
     ack_timer_.async_wait(boost::bind(&ConnectedState::AckTimerHandler,
                                       this->shared_from_this(), _1, false));
-    exp_timer_.expires_from_now(p_session_->connection_info.exp_period());
+    exp_timer_.expires_from_now(p_session->connection_info().exp_period());
     exp_timer_.async_wait(boost::bind(&ConnectedState::ExpTimerHandler,
                                       this->shared_from_this(), _1));
 
@@ -108,10 +106,22 @@ class ConnectedState : public BaseState<Protocol>,
   }
 
   virtual void Close() {
-    p_session_->ChangeState(ClosedState::Create(p_session_->get_io_service()));
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
+    if (!closed_.load()) {
+      closed_ = true;
+      p_session->ChangeState(ClosedState::Create(this->get_io_service()));
+    }
   }
 
   virtual void OnDataDgr(DataDatagram* p_datagram) {
+    if (closed_.load()) {
+      return;
+    }
+
     ResetExp(false);
 
     if (Logger::ACTIVE) {
@@ -130,10 +140,16 @@ class ConnectedState : public BaseState<Protocol>,
 
   virtual void PushReadOp(
       io::basic_pending_stream_read_operation<Protocol>* read_op) {
+    if (closed_.load()) {
+      return;
+    }
     receiver_.PushReadOp(read_op);
   }
 
   virtual void PushWriteOp(io::basic_pending_write_operation* write_op) {
+    if (closed_.load()) {
+      return;
+    }
     sender_.PushWriteOp(write_op);
   }
 
@@ -153,11 +169,21 @@ class ConnectedState : public BaseState<Protocol>,
   }
 
   virtual void OnConnectionDgr(ConnectionDatagramPtr p_connection_dgr) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+    if (closed_.load()) {
+      return;
+    }
     // Call policy to process connection datagram
-    this->ProcessConnectionDgr(p_session_, std::move(p_connection_dgr));
+    this->ProcessConnectionDgr(p_session.get(), std::move(p_connection_dgr));
   }
 
   virtual void OnControlDgr(ControlDatagram* p_control_dgr) {
+    if (closed_.load()) {
+      return;
+    }
     switch (p_control_dgr->header().flags()) {
       case ControlDatagram::Header::KEEP_ALIVE:
         ResetExp(false);
@@ -200,15 +226,24 @@ class ConnectedState : public BaseState<Protocol>,
 
  private:
   ConnectedState(typename SocketSession::Ptr p_session)
-      : p_session_(std::move(p_session)),
-        sender_(p_session_->get_io_service(), p_session_),
-        receiver_(p_session_->get_io_service(), p_session_),
+      : BaseState<Protocol>(p_session->get_io_service()),
+        p_session_(p_session),
+        sender_(p_session),
+        receiver_(p_session),
         unqueue_write_op_(false),
-        congestion_control_(&(p_session_->connection_info)),
+        congestion_control_(p_session->get_p_connection_info()),
         stop_timers_(false),
-        ack_timer_(p_session_->get_timer_io_service()),
-        nack_timer_(p_session_->get_timer_io_service()),
-        exp_timer_(p_session_->get_timer_io_service()) {}
+        ack_timer_(p_session->get_io_service()),
+        nack_timer_(p_session->get_io_service()),
+        exp_timer_(p_session->get_io_service()),
+        closed_(false),
+        nack_count_(0),
+        ack_count_(0),
+        ack_sent_count_(0),
+        ack2_count_(0),
+        ack2_sent_count_(0),
+        received_count_(0),
+        packet_received_since_light_ack_(0) {}
 
  private:
   void StopServices() {
@@ -228,6 +263,11 @@ class ConnectedState : public BaseState<Protocol>,
 
   void AckTimerHandler(const boost::system::error_code& ec,
                        bool light_ack = false) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (stop_timers_.load()) {
       return;
     }
@@ -236,16 +276,15 @@ class ConnectedState : public BaseState<Protocol>,
       LaunchAckTimer();
     }
 
-    auto& packet_seq_gen = p_session_->packet_seq_gen;
-
-    PacketSequenceNumber ack_number = receiver_.AckNumber(packet_seq_gen);
+    PacketSequenceNumber ack_number =
+        receiver_.AckNumber(p_session->packet_seq_gen());
 
     if (!light_ack &&
         (ack_number == receiver_.largest_ack_number_acknowledged() ||
          ((ack_number == receiver_.last_ack_number()) &&
           boost::chrono::duration_cast<boost::chrono::microseconds>(
               Clock::now() - receiver_.last_ack_timestamp()) <
-              2 * p_session_->connection_info.rtt()))) {
+              2 * p_session->connection_info().rtt()))) {
       return;
     }
 
@@ -253,12 +292,12 @@ class ConnectedState : public BaseState<Protocol>,
       ack_sent_count_ = ack_sent_count_.load() + 1;
     }
 
-    auto& ack_seq_gen = p_session_->ack_seq_gen;
+    auto* p_ack_seq_gen = p_session->get_p_ack_seq_gen();
     AckDatagramPtr p_ack_datagram = std::make_shared<AckDatagram>();
     auto& header = p_ack_datagram->header();
     auto& payload = p_ack_datagram->payload();
-    AckSequenceNumber ack_seq_num = ack_seq_gen.current();
-    ack_seq_gen.Next();
+    AckSequenceNumber ack_seq_num = p_ack_seq_gen->current();
+    p_ack_seq_gen->Next();
 
     payload.set_max_packet_sequence_number(ack_number);
     if (light_ack && packet_received_since_light_ack_.load() >= 64) {
@@ -267,9 +306,9 @@ class ConnectedState : public BaseState<Protocol>,
     } else {
       payload.SetAsFullAck();
       payload.set_rtt(
-          static_cast<uint32_t>(p_session_->connection_info.rtt().count()));
-      payload.set_rtt_var(
-          static_cast<uint32_t>(p_session_->connection_info.rtt_var().count()));
+          static_cast<uint32_t>(p_session->connection_info().rtt().count()));
+      payload.set_rtt_var(static_cast<uint32_t>(
+          p_session->connection_info().rtt_var().count()));
       uint32_t available_buffer(receiver_.AvailableReceiveBufferSize());
 
       if (available_buffer < 2) {
@@ -279,33 +318,38 @@ class ConnectedState : public BaseState<Protocol>,
       payload.set_available_buffer_size(available_buffer);
 
       payload.set_packet_arrival_speed(
-          (uint32_t)ceil(receiver_.GetPacketArrivalSpeed()));
+          static_cast<uint32_t>(ceil(receiver_.GetPacketArrivalSpeed())));
       payload.set_estimated_link_capacity(
-          (uint32_t)ceil(receiver_.GetEstimatedLinkCapacity()));
+          static_cast<uint32_t>(ceil(receiver_.GetEstimatedLinkCapacity())));
     }
 
     // register ack
     receiver_.StoreAck(ack_seq_num, ack_number, light_ack);
     receiver_.set_last_ack_number(ack_number);
 
-    header.set_timestamp((uint32_t)(
+    header.set_timestamp(static_cast<uint32_t>(
         boost::chrono::duration_cast<boost::chrono::microseconds>(
-            receiver_.last_ack_timestamp() - p_session_->start_timestamp)
+            receiver_.last_ack_timestamp() - p_session->start_timestamp())
             .count()));
 
     auto self = this->shared_from_this();
 
-    p_session_->AsyncSendControlPacket(
+    p_session->AsyncSendControlPacket(
         *p_ack_datagram, AckDatagram::Header::ACK, ack_seq_num,
         [self, p_ack_datagram](const boost::system::error_code&, std::size_t) {
         });
   }
 
   void LaunchAckTimer() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (stop_timers_.load()) {
       return;
     }
-    ack_timer_.expires_from_now(p_session_->connection_info.ack_period());
+    ack_timer_.expires_from_now(p_session->connection_info().ack_period());
     ack_timer_.async_wait(boost::bind(&ConnectedState::AckTimerHandler,
                                       this->shared_from_this(), _1, false));
   }
@@ -339,10 +383,15 @@ class ConnectedState : public BaseState<Protocol>,
   }
 
   void NAckTimerHandler(const boost::system::error_code& ec) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (stop_timers_.load()) {
       return;
     }
-    nack_timer_.expires_from_now(p_session_->connection_info.nack_period());
+    nack_timer_.expires_from_now(p_session->connection_info.nack_period());
     nack_timer_.async_wait(boost::bind(&ConnectedState::NAckTimerHandler,
                                        this->shared_from_this(), _1));
   }
@@ -359,18 +408,28 @@ class ConnectedState : public BaseState<Protocol>,
   }
 
   void LaunchExpTimer() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (stop_timers_.load()) {
       return;
     }
 
-    p_session_->connection_info.UpdateExpPeriod(receiver_.exp_count());
+    p_session->get_p_connection_info()->UpdateExpPeriod(receiver_.exp_count());
 
-    exp_timer_.expires_from_now(p_session_->connection_info.exp_period());
+    exp_timer_.expires_from_now(p_session->connection_info().exp_period());
     exp_timer_.async_wait(boost::bind(&ConnectedState::ExpTimerHandler,
                                       this->shared_from_this(), _1));
   }
 
   void ExpTimerHandler(const boost::system::error_code& ec) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (stop_timers_.load()) {
       return;
     }
@@ -399,7 +458,7 @@ class ConnectedState : public BaseState<Protocol>,
       KeepAliveDatagramPtr p_keep_alive_dgr =
           std::make_shared<KeepAliveDatagram>();
 
-      p_session_->AsyncSendControlPacket(
+      p_session->AsyncSendControlPacket(
           *p_keep_alive_dgr, KeepAliveDatagram::Header::KEEP_ALIVE,
           KeepAliveDatagram::Header::NO_ADDITIONAL_INFO,
           [self, p_keep_alive_dgr](const boost::system::error_code&,
@@ -414,8 +473,13 @@ class ConnectedState : public BaseState<Protocol>,
   // Packet processing
  private:
   void OnAck(const AckDatagram& ack_dgr) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     auto self = this->shared_from_this();
-    auto& packet_seq_gen = p_session_->packet_seq_gen;
+    const auto& packet_seq_gen = p_session->packet_seq_gen();
     auto& header = ack_dgr.header();
     auto& payload = ack_dgr.payload();
     PacketSequenceNumber packet_ack_number =
@@ -430,7 +494,7 @@ class ConnectedState : public BaseState<Protocol>,
 
     receiver_.set_last_ack2_seq_number(ack_seq_num);
     AckOfAckDatagramPtr p_ack2_dgr = std::make_shared<AckOfAckDatagram>();
-    p_session_->AsyncSendControlPacket(
+    p_session->AsyncSendControlPacket(
         *p_ack2_dgr, AckOfAckDatagram::Header::ACK_OF_ACK, ack_seq_num,
         [self, p_ack2_dgr](const boost::system::error_code&, std::size_t) {});
 
@@ -441,19 +505,18 @@ class ConnectedState : public BaseState<Protocol>,
         // available buffer size in packets
         int32_t offset = packet_seq_gen.SeqOffset(
             receiver_.largest_acknowledged_seq_number(), packet_ack_number);
-        p_session_->window_flow_size =
-            p_session_->window_flow_size.load() - offset;
+        p_session->set_window_flow_size(p_session->window_flow_size() - offset);
         receiver_.set_largest_acknowledged_seq_number(packet_ack_number);
       }
       return;
     }
 
-    p_session_->connection_info.UpdateRTT(payload.rtt());
-    uint32_t rtt_var = (uint32_t)abs((long long)payload.rtt() -
-                                     p_session_->connection_info.rtt().count());
-    p_session_->connection_info.UpdateRTTVar(rtt_var);
-    p_session_->connection_info.UpdateAckPeriod();
-    p_session_->connection_info.UpdateNAckPeriod();
+    p_session->get_p_connection_info()->UpdateRTT(payload.rtt());
+    uint32_t rtt_var = static_cast<uint32_t>(abs(
+        (long long)payload.rtt() - p_session->connection_info().rtt().count()));
+    p_session->get_p_connection_info()->UpdateRTTVar(rtt_var);
+    p_session->get_p_connection_info()->UpdateAckPeriod();
+    p_session->get_p_connection_info()->UpdateNAckPeriod();
 
     congestion_control_.OnAck(ack_dgr, packet_seq_gen);
 
@@ -461,12 +524,12 @@ class ConnectedState : public BaseState<Protocol>,
       uint32_t arrival_speed = payload.packet_arrival_speed();
       uint32_t estimated_link = payload.estimated_link_capacity();
       if (arrival_speed > 0) {
-        p_session_->connection_info.UpdatePacketArrivalSpeed(
-            (double)payload.packet_arrival_speed());
+        p_session->get_p_connection_info()->UpdatePacketArrivalSpeed(
+            static_cast<double>(payload.packet_arrival_speed()));
       }
       if (estimated_link > 0) {
-        p_session_->connection_info.UpdateEstimatedLinkCapacity(
-            (double)payload.estimated_link_capacity());
+        p_session->get_p_connection_info()->UpdateEstimatedLinkCapacity(
+            static_cast<double>(payload.estimated_link_capacity()));
       }
     }
 
@@ -475,21 +538,31 @@ class ConnectedState : public BaseState<Protocol>,
         0) {
       receiver_.set_largest_acknowledged_seq_number(packet_ack_number);
       // available buffer size in packets
-      p_session_->window_flow_size = payload.available_buffer_size();
+      p_session->set_window_flow_size(payload.available_buffer_size());
     }
   }
 
   void OnNAck(const NAckDatagram& nack_dgr) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     if (Logger::ACTIVE) {
       nack_count_ = nack_count_.load() + 1;
     }
 
     sender_.UpdateLossListFromNackDgr(nack_dgr);
-    congestion_control_.OnLoss(nack_dgr, p_session_->packet_seq_gen);
+    congestion_control_.OnLoss(nack_dgr, p_session->packet_seq_gen());
   }
 
   void OnAckOfAck(const AckOfAckDatagram& ack_of_ack_dgr) {
-    auto& packet_seq_gen = p_session_->packet_seq_gen;
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
+    const auto& packet_seq_gen = p_session->packet_seq_gen();
     AckSequenceNumber ack_seq_num = ack_of_ack_dgr.header().additional_info();
     PacketSequenceNumber packet_seq_num(0);
     boost::chrono::microseconds rtt(0);
@@ -506,29 +579,32 @@ class ConnectedState : public BaseState<Protocol>,
         receiver_.set_largest_ack_number_acknowledged(packet_seq_num);
       }
 
-      p_session_->connection_info.UpdateRTT(rtt.count());
+      p_session->get_p_connection_info()->UpdateRTT(rtt.count());
       uint64_t rtt_var =
-          abs(p_session_->connection_info.rtt().count() - rtt.count());
-      p_session_->connection_info.UpdateRTTVar(rtt_var);
+          abs(p_session->connection_info().rtt().count() - rtt.count());
+      p_session->get_p_connection_info()->UpdateRTTVar(rtt_var);
 
-      p_session_->connection_info.UpdateAckPeriod();
-      p_session_->connection_info.UpdateNAckPeriod();
+      p_session->get_p_connection_info()->UpdateAckPeriod();
+      p_session->get_p_connection_info()->UpdateNAckPeriod();
     }
   }
 
   void CloseConnection() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::system::error_code ec;
     congestion_control_.OnClose();
     auto self = this->shared_from_this();
     ShutdownDatagramPtr p_shutdown_dgr = std::make_shared<ShutdownDatagram>();
-    auto shutdown_handler =
-        [self, p_shutdown_dgr](const boost::system::error_code&, std::size_t) {
-          self->p_session_->Unbind();
-        };
+    auto shutdown_handler = [self, p_session, p_shutdown_dgr](
+        const boost::system::error_code&, std::size_t) { p_session->Unbind(); };
 
-    p_session_->p_connection_info_cache->Update(p_session_->connection_info);
+    p_session->UpdateCacheConnection();
 
-    p_session_->AsyncSendControlPacket(
+    p_session->AsyncSendControlPacket(
         *p_shutdown_dgr, ShutdownDatagram::Header::SHUTDOWN,
         ShutdownDatagram::Header::NO_ADDITIONAL_INFO, shutdown_handler);
   }
@@ -539,7 +615,7 @@ class ConnectedState : public BaseState<Protocol>,
   }
 
  private:
-  typename SocketSession::Ptr p_session_;
+  std::weak_ptr<SocketSession> p_session_;
   Sender sender_;
   Receiver receiver_;
   bool unqueue_write_op_;
@@ -548,6 +624,7 @@ class ConnectedState : public BaseState<Protocol>,
   Timer ack_timer_;
   Timer nack_timer_;
   Timer exp_timer_;
+  std::atomic<bool> closed_;
   std::atomic<uint32_t> nack_count_;
   std::atomic<uint32_t> ack_count_;
   std::atomic<uint32_t> ack_sent_count_;

@@ -29,30 +29,26 @@ namespace connected {
 template <class Protocol>
 class Receiver {
  private:
-  typedef typename Protocol::clock Clock;
-  typedef typename Protocol::timer Timer;
-  typedef typename Protocol::time_point TimePoint;
-
-  typedef std::queue<io::basic_pending_stream_read_operation<Protocol> *>
-      ReadOpsQueue;
-  typedef uint32_t packet_sequence_number_type;
-  typedef uint32_t ack_sequence_number_type;
-  typedef typename Protocol::socket_session SocketSession;
-  typedef typename Protocol::DataDatagram DataDatagram;
-  typedef std::shared_ptr<DataDatagram> DataDatagramPtr;
-  typedef typename Protocol::AckDatagram AckDatagram;
-  typedef std::shared_ptr<AckDatagram> AckDatagramPtr;
-  typedef typename Protocol::NAckDatagram NAckDatagram;
-  typedef std::shared_ptr<NAckDatagram> NAckDatagramPtr;
-
-  typedef std::map<packet_sequence_number_type, DataDatagram>
-      ReceivedDatagramsMap;
+  using Clock = typename Protocol::clock;
+  using Timer = typename Protocol::timer;
+  using TimePoint = typename Protocol::time_point;
+  using ReadOpsQueue =
+      std::queue<io::basic_pending_stream_read_operation<Protocol> *>;
+  using PacketSequenceNumber = uint32_t;
+  using AckSequenceNumber = uint32_t;
+  using SocketSession = typename Protocol::socket_session;
+  using DataDatagram = typename Protocol::DataDatagram;
+  using DataDatagramPtr = std::shared_ptr<DataDatagram>;
+  using AckDatagram = typename Protocol::AckDatagram;
+  using AckDatagramPtr = std::shared_ptr<AckDatagram>;
+  using NAckDatagram = typename Protocol::NAckDatagram;
+  using NAckDatagramPtr = std::shared_ptr<NAckDatagram>;
+  using ReceivedDatagramsMap = std::map<PacketSequenceNumber, DataDatagram>;
 
  public:
-  Receiver(boost::asio::io_service &io_service,
-           typename SocketSession::Ptr p_session)
+  Receiver(typename SocketSession::Ptr p_session)
       : mutex_(),
-        p_session_(std::move(p_session)),
+        p_session_(p_session),
         lrsn_(0),
         loss_list_(),
         read_ops_mutex_(),
@@ -60,11 +56,23 @@ class Receiver {
         max_received_size_(8192),
         packets_received_mutex_(),
         packets_received_(),
+        last_buffer_seq_(0),
         packet_history_window_(),
         ack_history_window_(),
-        exp_count_(0) {}
+        last_exp_reset_timestamp_(Clock::now()),
+        exp_count_(0),
+        largest_acknowledged_seq_number_(0),
+        last_ack2_seq_number_(0),
+        last_ack2_timestamp_(Clock::now()),
+        last_ack_number_(0),
+        last_ack_timestamp_(Clock::now()) {}
 
-  void Init(packet_sequence_number_type initial_packet_seq_num) {
+  void Init(PacketSequenceNumber initial_packet_seq_num) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::mutex::scoped_lock lock(mutex_);
     last_exp_reset_timestamp_ = Clock::now();
 
@@ -74,7 +82,7 @@ class Receiver {
     last_buffer_seq_ = initial_packet_seq_num - 1;
     last_ack_timestamp_ = Clock::now();
     last_ack2_timestamp_ = Clock::now();
-    auto &connection_info = p_session_->connection_info;
+    const auto &connection_info = p_session->connection_info();
 
     if (connection_info.packet_arrival_speed() > 0 &&
         connection_info.estimated_link_capacity() > 0) {
@@ -88,12 +96,16 @@ class Receiver {
   void Stop() { CloseReadOpsQueue(); }
 
   void OnDataDatagram(DataDatagram *p_datagram) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::mutex::scoped_lock lock(mutex_);
 
-    auto &packet_seq_gen = p_session_->packet_seq_gen;
+    const auto &packet_seq_gen = p_session->packet_seq_gen();
     auto &header = p_datagram->header();
-    packet_sequence_number_type packet_seq_num =
-        header.packet_sequence_number();
+    PacketSequenceNumber packet_seq_num = header.packet_sequence_number();
 
     // Save packet arrival time in receiver history window
     packet_history_window_.OnArrival();
@@ -115,7 +127,7 @@ class Receiver {
         auto first_seq_num_received_buffer = begin_pair.first;
         if (packet_seq_gen.SeqLength(first_seq_num_received_buffer,
                                      packet_seq_num) >
-            (int32_t)max_received_size_) {
+            static_cast<int32_t>(max_received_size_)) {
           // drop -> no more buffer space available
           return;
         }
@@ -143,9 +155,8 @@ class Receiver {
       } else {
         p_nack_dgr->payload().AddLossPacket(packet_seq_gen.Inc(lrsn_.load()));
       }
-      auto p_session = p_session_;
       // send nack datagram
-      p_session_->AsyncSendControlPacket(
+      p_session->AsyncSendControlPacket(
           *p_nack_dgr, NAckDatagram::Header::NACK,
           NAckDatagram::Header::NO_ADDITIONAL_INFO,
           [p_session, p_nack_dgr](const boost::system::error_code &,
@@ -163,20 +174,20 @@ class Receiver {
       packets_received_[packet_seq_num] = std::move(*p_datagram);
     }
 
-    p_session_->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
-                                                  boost::system::error_code()));
+    p_session->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
+                                                 boost::system::error_code()));
   }
 
-  void StoreAck(ack_sequence_number_type ack_seq_num,
-                packet_sequence_number_type ack_number, bool light_ack) {
+  void StoreAck(AckSequenceNumber ack_seq_num, PacketSequenceNumber ack_number,
+                bool light_ack) {
     ack_history_window_.StoreAck(ack_seq_num, ack_number);
     if (!light_ack) {
       last_ack_timestamp_ = Clock::now();
     }
   }
 
-  bool AckAck(ack_sequence_number_type ack_seq_num,
-              packet_sequence_number_type *p_packet_seq_num,
+  bool AckAck(AckSequenceNumber ack_seq_num,
+              PacketSequenceNumber *p_packet_seq_num,
               boost::chrono::microseconds *p_rtt) {
     return ack_history_window_.Acknowledge(ack_seq_num, p_packet_seq_num,
                                            p_rtt);
@@ -215,16 +226,20 @@ class Receiver {
   }
 
   void PushReadOp(io::basic_pending_stream_read_operation<Protocol> *read_op) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     {
       boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
       read_ops_queue_.push(read_op);
     }
-    p_session_->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
-                                                  boost::system::error_code()));
+    p_session->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
+                                                 boost::system::error_code()));
   }
 
-  packet_sequence_number_type AckNumber(
-      const SequenceGenerator &packet_seq_gen) {
+  PacketSequenceNumber AckNumber(const SequenceGenerator &packet_seq_gen) {
     boost::mutex::scoped_lock lock(mutex_);
     if (loss_list_.empty()) {
       return packet_seq_gen.Inc(lrsn_.load());
@@ -234,39 +249,39 @@ class Receiver {
   }
 
   void set_largest_acknowledged_seq_number(
-      packet_sequence_number_type largest_acknowledged_seq_number) {
+      PacketSequenceNumber largest_acknowledged_seq_number) {
     boost::mutex::scoped_lock lock(mutex_);
     largest_acknowledged_seq_number_ = largest_acknowledged_seq_number;
   }
 
-  packet_sequence_number_type largest_acknowledged_seq_number() {
+  PacketSequenceNumber largest_acknowledged_seq_number() {
     boost::mutex::scoped_lock lock(mutex_);
     return largest_acknowledged_seq_number_;
   }
 
   void set_largest_ack_number_acknowledged(
-      packet_sequence_number_type largest_ack_number_acknowledged) {
+      PacketSequenceNumber largest_ack_number_acknowledged) {
     boost::mutex::scoped_lock lock(mutex_);
     largest_ack_number_acknowledged_ = largest_ack_number_acknowledged;
   }
 
-  packet_sequence_number_type largest_ack_number_acknowledged() {
+  PacketSequenceNumber largest_ack_number_acknowledged() {
     boost::mutex::scoped_lock lock(mutex_);
     return largest_ack_number_acknowledged_;
   }
 
-  void set_last_ack2_seq_number(ack_sequence_number_type last_ack2_seq_number) {
+  void set_last_ack2_seq_number(AckSequenceNumber last_ack2_seq_number) {
     boost::mutex::scoped_lock lock(mutex_);
     last_ack2_seq_number_ = last_ack2_seq_number;
     last_ack2_timestamp_ = Clock::now();
   }
 
-  void set_last_ack_number(packet_sequence_number_type last_ack_number) {
+  void set_last_ack_number(PacketSequenceNumber last_ack_number) {
     boost::mutex::scoped_lock lock(mutex_);
     last_ack_number_ = last_ack_number;
   }
 
-  packet_sequence_number_type last_ack_number() {
+  PacketSequenceNumber last_ack_number() {
     boost::mutex::scoped_lock lock(mutex_);
     return last_ack_number_;
   }
@@ -278,6 +293,11 @@ class Receiver {
 
  private:
   void HandleQueues(boost::system::error_code &ec) {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::mutex::scoped_lock packet_received_lock(packets_received_mutex_);
     boost::mutex::scoped_lock read_ops_lock_(read_ops_mutex_);
 
@@ -290,7 +310,7 @@ class Receiver {
       return;
     }
 
-    auto &packet_seq_gen = p_session_->packet_seq_gen;
+    const auto &packet_seq_gen = p_session->packet_seq_gen();
 
     io::fixed_const_buffer_sequence packets_buffer;
 
@@ -345,10 +365,15 @@ class Receiver {
     auto do_complete =
         [read_op, ec, copied]() { read_op->complete(ec, copied); };
 
-    p_session_->get_io_service().post(std::move(do_complete));
+    p_session->get_io_service().post(std::move(do_complete));
   }
 
   void CloseReadOpsQueue() {
+    auto p_session = p_session_.lock();
+    if (!p_session) {
+      return;
+    }
+
     boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
     // Unqueue read ops queue and callback with error code
     io::basic_pending_stream_read_operation<Protocol> *p_read_op;
@@ -360,7 +385,7 @@ class Receiver {
                                      ::common::error::get_error_category());
         p_read_op->complete(ec, 0);
       };
-      p_session_->get_io_service().dispatch(std::move(do_complete));
+      p_session->get_io_service().dispatch(std::move(do_complete));
     }
   }
 
@@ -368,13 +393,13 @@ class Receiver {
   // mutex
   boost::mutex mutex_;
   // session
-  typename SocketSession::Ptr p_session_;
+  std::weak_ptr<SocketSession> p_session_;
 
   // packet largest received sequence number
-  std::atomic<packet_sequence_number_type> lrsn_;
+  std::atomic<PacketSequenceNumber> lrsn_;
 
   // packets loss list, sorted by seq_number increased order
-  std::set<packet_sequence_number_type> loss_list_;
+  std::set<PacketSequenceNumber> loss_list_;
 
   // Read ops queue
   boost::mutex read_ops_mutex_;
@@ -384,7 +409,7 @@ class Receiver {
   uint32_t max_received_size_;
   boost::mutex packets_received_mutex_;
   ReceivedDatagramsMap packets_received_;
-  packet_sequence_number_type last_buffer_seq_;
+  PacketSequenceNumber last_buffer_seq_;
 
   // packet history window (arrival time of data packet)
   PacketTimeHistoryWindow packet_history_window_;
@@ -397,15 +422,15 @@ class Receiver {
   // consecutive expired timeout : timeout > 16
   std::atomic<uint64_t> exp_count_;
 
-  packet_sequence_number_type largest_acknowledged_seq_number_;
+  PacketSequenceNumber largest_acknowledged_seq_number_;
   // largest ack number acknowledged by ACK2
-  packet_sequence_number_type largest_ack_number_acknowledged_;
+  PacketSequenceNumber largest_ack_number_acknowledged_;
   // last ack2 sent back
-  ack_sequence_number_type last_ack2_seq_number_;
+  AckSequenceNumber last_ack2_seq_number_;
   // last ack2 timestamp
   TimePoint last_ack2_timestamp_;
   // last ack number
-  packet_sequence_number_type last_ack_number_;
+  PacketSequenceNumber last_ack_number_;
   // last ack timestamp
   TimePoint last_ack_timestamp_;
 };

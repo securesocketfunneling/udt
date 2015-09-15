@@ -20,37 +20,39 @@
 #include "udt/connected_protocol/protocol.h"
 #include "udt/ip/udt.h"
 
-typedef ip::udt<> udt_protocol;
+using udt_protocol = ip::udt<>;
 
-TEST(UDTTest, AsioProtocolTests) {
-  TestAsioProtocol<udt_protocol>();
-}
+TEST(UDTTest, AsioProtocolTests) { TestAsioProtocol<udt_protocol>(); }
 
-TEST(UDTTest, AsioEndpointTests) {
-  TestAsioEndpoint<udt_protocol>();
-}
+TEST(UDTTest, AsioEndpointTests) { TestAsioEndpoint<udt_protocol>(); }
 
 TEST(UDTTest, UDTTestMultipleConnections) {
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(), "9000");
+  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
+                                                   "9000");
+  udt_protocol::resolver::query client_local_udt_query("127.0.0.1", "8000");
   udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
 
-  TestMultipleConnections<udt_protocol>(client_udt_query, acceptor_udt_query,
-                                        20);
+  TestMultipleConnections<udt_protocol>(
+      client_local_udt_query, client_udt_query, acceptor_udt_query, 200);
 }
 
 TEST(UDTTest, UDTProtocolTest) {
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(), "9000");
+  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
+                                                   "9000");
   udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
 
-  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 10);
+  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 100);
 
   TestStreamProtocolFuture<udt_protocol>(client_udt_query, acceptor_udt_query);
 
   TestStreamProtocolSpawn<udt_protocol>(client_udt_query, acceptor_udt_query);
+
+  TestStreamProtocolSynchronous<udt_protocol>(client_udt_query,
+                                              acceptor_udt_query);
 }
 
 // TEST(UDTTestFixture, Coroutine) {
-//  typedef boost::asio::ip::tcp tcp;
+//  using tcp = boost::asio::ip::tcp;
 //
 //  boost::asio::io_service io_service;
 //  tcp::endpoint endpoint(tcp::v4(), 9000);

@@ -14,28 +14,18 @@ namespace connected_protocol {
 template <class Protocol>
 class MultiplexerManager {
  public:
-  typedef typename Protocol::next_layer_protocol::socket NextSocket;
-  typedef typename Protocol::next_layer_protocol::endpoint NextLayerEndpoint;
+  using NextSocket = typename Protocol::next_layer_protocol::socket;
+  using NextLayerEndpoint = typename Protocol::next_layer_protocol::endpoint;
 
  private:
-  typedef typename Multiplexer<Protocol>::Ptr MultiplexerPtr;
-  typedef std::map<NextLayerEndpoint, MultiplexerPtr> MultiplexersMap;
+  using MultiplexerPtr = typename Multiplexer<Protocol>::Ptr;
+  using MultiplexersMap = std::map<NextLayerEndpoint, MultiplexerPtr>;
 
   // TODO move multiplexers management in service
  public:
   MultiplexerManager() : mutex_(), multiplexers_() {}
-
-  MultiplexerPtr GetMultiplexer(const NextLayerEndpoint &next_local_endpoint) {
-    boost::mutex::scoped_lock lock(mutex_);
-    auto multiplexer_it = multiplexers_.find(next_local_endpoint);
-    if (multiplexer_it != multiplexers_.end()) {
-      return multiplexer_it->second;
-    }
-
-    return nullptr;
-  }
-
-  MultiplexerPtr CreateMultiplexer(boost::asio::io_service &io_service,
+  
+  MultiplexerPtr GetMultiplexer(boost::asio::io_service &io_service,
                                    const NextLayerEndpoint &next_local_endpoint,
                                    boost::system::error_code &ec) {
     boost::mutex::scoped_lock lock(mutex_);

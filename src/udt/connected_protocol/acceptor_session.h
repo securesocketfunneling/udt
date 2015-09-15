@@ -5,6 +5,7 @@
 #include <memory>
 
 #include <boost/asio/detail/op_queue.hpp>
+#include <boost/asio/socket_base.hpp>
 
 #include <boost/log/trivial.hpp>
 #include <boost/thread.hpp>
@@ -25,26 +26,26 @@ template <class Protocol>
 class AcceptorSession
     : public common::Observer<typename Protocol::socket_session> {
  private:
-  typedef typename Protocol::time_point TimePoint;
-  typedef typename Protocol::clock Clock;
+  using TimePoint = typename Protocol::time_point;
+  using Clock = typename Protocol::clock;
 
  private:
-  typedef typename Protocol::socket_session SocketSession;
-  typedef std::shared_ptr<SocketSession> SocketSessionPtr;
-  typedef typename Protocol::next_layer_protocol::endpoint NextLayerEndpoint;
-  typedef std::shared_ptr<NextLayerEndpoint> NextLayerEndpointPtr;
-  typedef typename Protocol::ConnectionDatagram ConnectionDatagram;
-  typedef std::shared_ptr<ConnectionDatagram> ConnectionDatagramPtr;
-  typedef typename state::ClosedState<Protocol> ClosedState;
-  typedef typename state::AcceptingState<Protocol> AcceptingState;
-  typedef typename common::Observer<SocketSession> Observer;
-  typedef typename io::basic_pending_accept_operation<Protocol> AcceptOp;
-  typedef boost::asio::detail::op_queue<AcceptOp> AcceptOpQueue;
+  using SocketSession = typename Protocol::socket_session;
+  using SocketSessionPtr = std::shared_ptr<SocketSession>;
+  using NextLayerEndpoint = typename Protocol::next_layer_protocol::endpoint;
+  using NextLayerEndpointPtr = std::shared_ptr<NextLayerEndpoint>;
+  using ConnectionDatagram = typename Protocol::ConnectionDatagram;
+  using ConnectionDatagramPtr = std::shared_ptr<ConnectionDatagram>;
+  using ClosedState = typename state::ClosedState<Protocol>;
+  using AcceptingState = typename state::AcceptingState<Protocol>;
+  using Observer = typename common::Observer<SocketSession>;
+  using AcceptOp = typename io::basic_pending_accept_operation<Protocol>;
+  using AcceptOpQueue = boost::asio::detail::op_queue<AcceptOp>;
 
-  typedef std::shared_ptr<typename Protocol::multiplexer> MultiplexerPtr;
+  using MultiplexerPtr = std::shared_ptr<typename Protocol::multiplexer>;
 
-  typedef uint32_t socket_id_type;
-  typedef std::map<socket_id_type, SocketSessionPtr> RemoteSessionsMap;
+  using SocketId = uint32_t;
+  using RemoteSessionsMap = std::map<SocketId, SocketSessionPtr>;
 
  public:
   AcceptorSession()
@@ -55,6 +56,7 @@ class AcceptorSession
         connected_sessions_(),
         previous_connected_sessions_(),
         listening_(false),
+        max_pending_connections_(boost::asio::socket_base::max_connections),
         start_time_point_(Clock::now()) {}
 
   ~AcceptorSession() { StopListen(); }
@@ -65,7 +67,18 @@ class AcceptorSession
 
   bool IsListening() { return listening_; }
 
-  void Listen() { listening_ = true; }
+  void Listen(int backlog, boost::system::error_code& ec) {
+    if (!listening_) {
+      listening_ = true;
+      max_pending_connections_ =
+          static_cast<uint32_t>(backlog >= 0 ? backlog : 0);
+      ec.assign(::common::error::success,
+                ::common::error::get_error_category());
+    } else {
+      ec.assign(::common::error::device_or_resource_busy,
+                ::common::error::get_error_category());
+    }
+  }
 
   void StopListen() { listening_ = false; }
 
@@ -98,7 +111,7 @@ class AcceptorSession
 
     boost::system::error_code ec(::common::error::interrupted,
                                  ::common::error::get_error_category());
-    Accept(ec);
+    CleanAcceptOps(ec);
     p_multiplexer_->RemoveAcceptor();
   }
 
@@ -108,10 +121,7 @@ class AcceptorSession
       accept_ops_.push(p_accept_op);
     }
 
-    boost::system::error_code ec;
-    Accept(ec);
-
-    // @todo: should ec be swallowed here?
+    Accept();
   }
 
   void PushConnectionDgr(ConnectionDatagramPtr p_connection_dgr,
@@ -157,8 +167,8 @@ class AcceptorSession
         BOOST_LOG_TRIVIAL(trace) << "Error on socket session creation";
       }
 
-      p_socket_session->remote_socket_id = remote_socket_id;
-      p_socket_session->syn_cookie = server_cookie;
+      p_socket_session->set_remote_socket_id(remote_socket_id);
+      p_socket_session->set_syn_cookie(server_cookie);
       p_socket_session->AddObserver(this);
       p_socket_session->ChangeState(AcceptingState::Create(p_socket_session));
 
@@ -168,57 +178,19 @@ class AcceptorSession
     p_socket_session->PushConnectionDgr(p_connection_dgr);
   }
 
-  void Accept(boost::system::error_code& ec = boost::system::error_code()) {
-    if (!p_multiplexer_) {
-      return;
-    }
-
-    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
-
-    if (!ec) {
-      if (!connected_sessions_.empty() && !accept_ops_.empty()) {
-        auto p_connected_pair = connected_sessions_.begin();
-        auto p_socket_session = p_connected_pair->second;
-
-        auto op = std::move(accept_ops_.front());
-        accept_ops_.pop();
-
-        auto& peer_socket = op->peer();
-        auto& impl = peer_socket.native_handle();
-        impl = p_socket_session;
-        auto do_complete = [op, p_socket_session, ec]() { op->complete(ec); };
-
-        previous_connected_sessions_[p_connected_pair->first] =
-            p_socket_session;
-        connected_sessions_.erase(p_connected_pair->first);
-        p_multiplexer_->get_io_service().post(std::move(do_complete));
-        return;
-      }
-    } else {
-      while (!accept_ops_.empty()) {
-        auto op = std::move(accept_ops_.front());
-        accept_ops_.pop();
-
-        auto do_complete = [op, ec]() { op->complete(ec); };
-
-        p_multiplexer_->get_io_service().post(std::move(do_complete));
-      }
-    }
-  }
-
   virtual void Notify(typename Protocol::socket_session* p_subject) {
     if (p_subject->GetState() ==
         connected_protocol::state::BaseState<Protocol>::CONNECTED) {
       boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
       auto connecting_it =
-          connecting_sessions_.find(p_subject->remote_socket_id);
+          connecting_sessions_.find(p_subject->remote_socket_id());
 
       if (connecting_it != connecting_sessions_.end()) {
-        boost::system::error_code ec;
-        connected_sessions_.insert(*connecting_it);
+        if (connected_sessions_.size() <= max_pending_connections_) {
+          connected_sessions_.insert(*connecting_it);
+        }
         connecting_sessions_.erase(connecting_it->first);
-        Accept(ec);
-        // @todo: should ec be swallowed here?
+        Accept();
       }
 
       return;
@@ -227,16 +199,61 @@ class AcceptorSession
     if (p_subject->GetState() ==
         connected_protocol::state::BaseState<Protocol>::CLOSED) {
       boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
-      connecting_sessions_.erase(p_subject->remote_socket_id);
-      connected_sessions_.erase(p_subject->remote_socket_id);
-      previous_connected_sessions_.erase(p_subject->remote_socket_id);
+      connecting_sessions_.erase(p_subject->remote_socket_id());
+      connected_sessions_.erase(p_subject->remote_socket_id());
+      previous_connected_sessions_.erase(p_subject->remote_socket_id());
 
       return;
     }
   }
 
  private:
-  SocketSessionPtr GetSession(socket_id_type remote_socket_id) {
+  void Accept() {
+    if (!p_multiplexer_) {
+      return;
+    }
+
+    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
+    if (!connected_sessions_.empty() && !accept_ops_.empty()) {
+      boost::system::error_code ec(::common::error::success,
+                                   ::common::error::get_error_category());
+      auto p_connected_pair = connected_sessions_.begin();
+      auto p_socket_session = p_connected_pair->second;
+
+      auto op = std::move(accept_ops_.front());
+      accept_ops_.pop();
+
+      auto& peer_socket = op->peer();
+      auto& impl = peer_socket.native_handle();
+      impl.p_multiplexer = p_multiplexer_;
+      impl.p_session = p_socket_session;
+      auto do_complete = [op, p_socket_session, ec]() { op->complete(ec); };
+
+      previous_connected_sessions_[p_connected_pair->first] = p_socket_session;
+      connected_sessions_.erase(p_connected_pair->first);
+      p_multiplexer_->get_io_service().post(std::move(do_complete));
+      return;
+    }
+  }
+
+  /// Pop and post accept ops with the given error code
+  void CleanAcceptOps(const boost::system::error_code& ec) {
+    if (!p_multiplexer_) {
+      return;
+    }
+
+    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
+    while (!accept_ops_.empty()) {
+      auto op = std::move(accept_ops_.front());
+      accept_ops_.pop();
+
+      auto do_complete = [op, ec]() { op->complete(ec); };
+
+      p_multiplexer_->get_io_service().post(std::move(do_complete));
+    }
+  }
+
+  SocketSessionPtr GetSession(SocketId remote_socket_id) {
     boost::recursive_mutex::scoped_lock lock(mutex_);
     auto connecting_it = connecting_sessions_.find(remote_socket_id);
     if (connecting_it != connecting_sessions_.end()) {
@@ -305,6 +322,7 @@ class AcceptorSession
   RemoteSessionsMap connected_sessions_;
   RemoteSessionsMap previous_connected_sessions_;
   bool listening_;
+  uint32_t max_pending_connections_;
   TimePoint start_time_point_;
 };
 

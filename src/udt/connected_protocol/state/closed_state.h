@@ -11,25 +11,20 @@ namespace state {
 template <class Protocol>
 class ClosedState : public BaseState<Protocol> {
  public:
-  typedef std::shared_ptr<ClosedState> Ptr;
-  typedef typename Protocol::socket_session SocketSession;
-  typedef typename Protocol::ConnectionDatagram ConnectionDatagram;
-  typedef std::shared_ptr<ConnectionDatagram> ConnectionDatagramPtr;
+  using Ptr = std::shared_ptr<ClosedState>;
 
  public:
   static Ptr Create(boost::asio::io_service& io_service) {
     return Ptr(new ClosedState(io_service));
   }
 
+  virtual ~ClosedState() {}
+
   virtual typename BaseState<Protocol>::type GetType() { return this->CLOSED; }
 
-  virtual boost::asio::io_service& get_io_service() { return io_service_; }
-
  private:
-  ClosedState(boost::asio::io_service& io_service) : io_service_(io_service) {}
-
- private:
-  boost::asio::io_service& io_service_;
+  ClosedState(boost::asio::io_service& io_service)
+      : BaseState<Protocol>(io_service) {}
 };
 
 }  // state
