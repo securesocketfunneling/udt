@@ -49,6 +49,26 @@ local_arrival_speed = [row.split(' ')[15] for row in data[first:end]]
 local_link_capacity = [row.split(' ')[16] for row in data[first:end]]
 remote_window_flow_size = [row.split(' ')[17] for row in data[first:end]]
 
+mean_sending_period = np.mean(list(map(float, sending_period)))
+
+print("Means :")
+print(" * rtt : %d us" % (np.mean(list(map(float, rtt)))))
+if (mean_sending_period > 0):
+  print(" * sending period : %d us" % mean_sending_period)
+  print(" * bandwidth : %d packets/sec ( %dMbits / sec)" % (1000000 / mean_sending_period , 1 / mean_sending_period * 1500 * 8))
+
+print(" * congestion window flow size : %d packets" % (np.mean(list(map(float, cc_window_flow_size)))))
+print(" * local arrival speed : %d packets/sec" % (np.mean(list(map(float, local_arrival_speed)))))
+print(" * local link capacity : %d packets/sec" % (np.mean(list(map(float, local_link_capacity)))))
+print(" * ack_sent_count : %d" % (np.mean(list(map(float, ack_sent_count)))))
+print(" * ack2_sent_count : %d" % (np.mean(list(map(float, ack2_sent_count)))))
+print("\n")
+print(" * remote window flow size : %d packets" % (np.mean(list(map(float, remote_window_flow_size)))))
+print(" * remote arrival speed : %d packets/sec" % (np.mean(list(map(float, remote_arrival_speed)))))
+print(" * remote link capacity : %d packets/sec" % (np.mean(list(map(float, remote_link_capacity)))))
+print(" * ack count : %d" % (np.mean(list(map(float, ack_count)))))
+print(" * ack2 count : %d" % (np.mean(list(map(float, ack2_count)))))
+
 y_client = [
   sending_period,
   cc_window_flow_size,

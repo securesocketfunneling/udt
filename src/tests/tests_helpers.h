@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/log/trivial.hpp>
 #include <boost/system/error_code.hpp>
 
 namespace tests {
@@ -48,12 +49,17 @@ struct helpers {
   static bool CheckHalfBuffers(const Buffer& buffer1, const HalfBuffer& buffer2,
                                bool first_half = true) {
     if (buffer1.size() / 2 != buffer2.size()) {
+      BOOST_LOG_TRIVIAL(trace) << "Check buffer size failed";
       return false;
     }
     std::size_t begin(first_half ? 0 : buffer2.size());
     std::size_t end(first_half ? buffer2.size() : buffer1.size());
     for (std::size_t i = begin; i < end; ++i) {
       if (buffer1[i] != buffer2[i - begin]) {
+        BOOST_LOG_TRIVIAL(trace)
+            << "Check buffer failed at index " << i << " : "
+            << static_cast<uint8_t>(buffer1[i])
+            << " != " << static_cast<uint8_t>(buffer2[i - begin]);
         return false;
       }
     }

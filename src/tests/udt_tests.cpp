@@ -36,6 +36,21 @@ TEST(UDTTest, UDTTestMultipleConnections) {
       client_local_udt_query, client_udt_query, acceptor_udt_query, 200);
 }
 
+TEST(UDTTest, UDTProtocolLightExchangeTest) {
+  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
+                                                   "9000");
+  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
+
+  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 1);
+
+  TestStreamProtocolFuture<udt_protocol>(client_udt_query, acceptor_udt_query);
+
+  TestStreamProtocolSpawn<udt_protocol>(client_udt_query, acceptor_udt_query);
+
+  TestStreamProtocolSynchronous<udt_protocol>(client_udt_query,
+                                              acceptor_udt_query);
+}
+
 TEST(UDTTest, UDTProtocolTest) {
   udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
                                                    "9000");

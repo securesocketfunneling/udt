@@ -32,8 +32,12 @@ void TestMultipleConnections(
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
 
-  uint64_t count_acceptor = 0;
-  uint64_t count_connected = 0;
+  std::promise<bool> accepted_ok;
+  std::atomic<bool> accepted_strike(false);
+  std::atomic<uint64_t> count_acceptor(0);
+  std::promise<bool> connected_ok;
+  std::atomic<bool> connected_strike(false);
+  std::atomic<uint64_t> count_connected(0);
 
   tests::helpers::AcceptHandler accepted;
   tests::helpers::ConnectHandler connected;
@@ -66,37 +70,31 @@ void TestMultipleConnections(
   typename StreamProtocol::endpoint local_endpoint(*local_endpoint_it);
 
   accepted = [&](const boost::system::error_code& ec) {
-    ASSERT_EQ(0, ec.value())
+    EXPECT_EQ(0, ec.value())
         << "Accept handler should not be in error: " << ec.message();
-    ++count_acceptor;
-    if (count_acceptor == max_connections) {
-      boost::system::error_code close_ec;
-      acceptor.close(close_ec);
-      ASSERT_EQ(0, resolve_ec.value())
-          << "Closing acceptor should not be in error: "
-          << resolve_ec.message();
-      std::cout << "Closing accepted sockets" << std::endl;
-      for (int i = 1; i < 2 * max_connections; i = i + 2) {
-        sockets[i].close(close_ec);
-        ASSERT_EQ(0, resolve_ec.value())
-            << "Closing socket should not be in error: "
-            << resolve_ec.message();
+    if (ec) {
+      accepted_strike = true;
+      accepted_ok.set_value(false);
+    }
+    if (!accepted_strike) {
+      ++count_acceptor;
+      if (count_acceptor == max_connections) {
+        accepted_ok.set_value(true);
       }
     }
   };
 
   connected = [&](const boost::system::error_code& ec) {
-    ASSERT_EQ(0, ec.value())
+    EXPECT_EQ(0, ec.value())
         << "Connect handler should not be in error: " << ec.message();
-    ++count_connected;
-    if (count_connected == max_connections) {
-      boost::system::error_code close_ec;
-      std::cout << "Closing connected sockets" << std::endl;
-      for (int i = 0; i < 2 * max_connections; i = i + 2) {
-        sockets[i].close(close_ec);
-        ASSERT_EQ(0, resolve_ec.value())
-            << "Closing socket should not be in error: "
-            << resolve_ec.message();
+    if (ec) {
+      connected_strike = true;
+      connected_ok.set_value(false);
+    }
+    if (!connected_strike) {
+      ++count_connected;
+      if (count_connected == max_connections) {
+        connected_ok.set_value(true);
       }
     }
   };
@@ -128,9 +126,41 @@ void TestMultipleConnections(
   }
 
   boost::thread_group threads;
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
+
+  ASSERT_TRUE(accepted_ok.get_future().get()) << "Accepted all sessions NOK "
+                                              << count_acceptor << "/"
+                                              << max_connections;
+  ASSERT_TRUE(connected_ok.get_future().get()) << "Connected all sessions NOK "
+                                               << count_connected << "/"
+                                               << max_connections;
+
+  boost::system::error_code acceptor_close_ec;
+  acceptor.close(acceptor_close_ec);
+  ASSERT_EQ(0, acceptor_close_ec.value())
+      << "Closing acceptor should not be in error: "
+      << acceptor_close_ec.message();
+
+  std::cout << "Closing accepted sockets" << std::endl;
+  for (int i = 1; i < 2 * max_connections; i = i + 2) {
+    boost::system::error_code close_ec;
+    sockets[i].close(close_ec);
+    ASSERT_EQ(0, close_ec.value())
+        << "Closing accepted socket should not be in error: "
+        << close_ec.message();
+  }
+
+  std::cout << "Closing connected sockets" << std::endl;
+  for (int i = 0; i < 2 * max_connections; i = i + 2) {
+    boost::system::error_code close_ec;
+    sockets[i].close(close_ec);
+    ASSERT_EQ(0, close_ec.value())
+        << "Closing connected socket should not be in error: "
+        << close_ec.message();
+  }
+
   threads.join_all();
 }
 
@@ -181,8 +211,11 @@ void TestStreamProtocol(
       << resolve_ec.message();
   typename StreamProtocol::endpoint remote_endpoint(*remote_endpoint_it);
 
-  bool first_received_socket_1 = true;
-  bool first_received_socket_2 = true;
+  boost::mutex first_received_mutex1;
+  std::atomic<bool> first_received_socket_1(true);
+
+  boost::mutex first_received_mutex2;
+  std::atomic<bool> first_received_socket_2(true);
 
   tests::helpers::AcceptHandler accepted;
   tests::helpers::ConnectHandler connected;
@@ -248,15 +281,19 @@ void TestStreamProtocol(
           << "Endpoints should be equal";
     }
 
-    if (first_received_socket_1) {
-      ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer2, r_buffer1, true));
-      tests::helpers::ResetBuffer(&r_buffer1, 0);
-      first_received_socket_1 = false;
-      boost::asio::async_read(socket1, boost::asio::buffer(r_buffer1),
-                              received_handler1);
-      return;
+    {
+      boost::mutex::scoped_lock lock_first_received1(first_received_mutex1);
+      if (first_received_socket_1) {
+        ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer2, r_buffer1, true));
+        tests::helpers::ResetBuffer(&r_buffer1, 0);
+        first_received_socket_1 = false;
+        boost::asio::async_read(socket1, boost::asio::buffer(r_buffer1),
+                                received_handler1);
+        return;
+      }
+      first_received_socket_1 = true;
     }
-    first_received_socket_1 = true;
+
     ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer2, r_buffer1, false));
     ++count1;
     if (count1 < max_packets) {
@@ -266,13 +303,16 @@ void TestStreamProtocol(
       ASSERT_EQ(max_packets, count1);
       boost::system::error_code close_ec;
 
+      std::cout << " * Closing acceptor" << std::endl;
       acceptor.close(close_ec);
       ASSERT_EQ(false, acceptor.is_open());
 
+      std::cout << " * Closing socket1" << std::endl;
       socket1.shutdown(boost::asio::socket_base::shutdown_both, close_ec);
       socket1.close(close_ec);
       ASSERT_EQ(false, socket1.is_open());
 
+      std::cout << " * Closing socket2" << std::endl;
       socket2.shutdown(boost::asio::socket_base::shutdown_both, close_ec);
       socket2.close(close_ec);
       ASSERT_EQ(false, socket2.is_open());
@@ -284,16 +324,19 @@ void TestStreamProtocol(
     ASSERT_EQ(0, ec.value())
         << "Receive handler should not be in error: " << ec.message();
 
-    if (first_received_socket_2) {
-      ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer1, r_buffer2, true));
-      tests::helpers::ResetBuffer(&r_buffer1, 0);
-      boost::asio::async_read(socket2, boost::asio::buffer(r_buffer2),
-                              received_handler2);
-      first_received_socket_2 = false;
-      return;
-    }
+    {
+      boost::mutex::scoped_lock lock_first_received2(first_received_mutex2);
+      if (first_received_socket_2) {
+        ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer1, r_buffer2, true));
+        tests::helpers::ResetBuffer(&r_buffer1, 0);
+        boost::asio::async_read(socket2, boost::asio::buffer(r_buffer2),
+                                received_handler2);
+        first_received_socket_2 = false;
+        return;
+      }
 
-    first_received_socket_2 = true;
+      first_received_socket_2 = true;
+    }
     ASSERT_TRUE(tests::helpers::CheckHalfBuffers(buffer1, r_buffer2, false));
     ++count2;
     if (count2 < max_packets) {
@@ -341,7 +384,7 @@ void TestStreamProtocol(
   socket1.async_connect(remote_endpoint, connected);
 
   boost::thread_group threads;
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
   threads.join_all();
@@ -443,7 +486,7 @@ void TestStreamProtocolFuture(
   boost::thread_group threads;
   threads.create_thread(lambda2);
   threads.create_thread(lambda1);
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
   threads.join_all();
@@ -530,7 +573,7 @@ void TestStreamProtocolSpawn(
   boost::thread_group threads;
   boost::asio::spawn(io_service, lambda2);
   boost::asio::spawn(io_service, lambda1);
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
   threads.join_all();
@@ -621,7 +664,7 @@ void TestStreamProtocolSynchronous(
   boost::thread_group threads;
   threads.create_thread(std::move(lambda2));
   threads.create_thread(std::move(lambda1));
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
   threads.join_all();
@@ -655,7 +698,7 @@ void TestStreamErrorConnectionProtocol(
                                             connection_error_handler);
 
   boost::thread_group threads;
-  for (uint16_t i = 1; i <= 8; ++i) {
+  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
   }
   threads.join_all();
