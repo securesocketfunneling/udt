@@ -1,13 +1,15 @@
 #ifndef UDT_QUEUE_ASYNC_QUEUE_H_
 #define UDT_QUEUE_ASYNC_QUEUE_H_
 
-#include <queue>
+#include <cstdint>
 
-#include <boost/integer_traits.hpp>
+#include <queue>
 
 #include <boost/asio/basic_io_object.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/async_result.hpp>
+
+#include <boost/integer_traits.hpp>
 
 #include "udt/queue/async_queue_service.h"
 
@@ -16,15 +18,15 @@ namespace queue {
 template <class Ttype, class Container = std::queue<Ttype>,
           uint32_t QueueMaxSize = boost::integer_traits<uint32_t>::const_max,
           uint32_t OPQueueMaxSize = boost::integer_traits<uint32_t>::const_max,
-          class Service = basic_async_queue_service<
-              Ttype, Container, QueueMaxSize, OPQueueMaxSize>>
+          class Service = basic_async_queue_service<Ttype, Container, QueueMaxSize,
+                                                    OPQueueMaxSize>>
 class basic_async_queue : public boost::asio::basic_io_object<Service> {
  private:
-  using T = typename std::remove_reference<Ttype>::type;
+  typedef Ttype T;
 
  public:
-  using value_type = typename Service::value_type;
-  using container_type = typename Service::container_type;
+  typedef typename Service::value_type value_type;
+  typedef typename Service::container_type container_type;
   enum {
     kQueueMaxSize = Service::kQueueMaxSize,
     kOPQueueMaxSize = Service::kOPQueueMaxSize
@@ -32,13 +34,24 @@ class basic_async_queue : public boost::asio::basic_io_object<Service> {
 
  public:
   basic_async_queue(boost::asio::io_service& io_service)
-      : boost::asio::basic_io_object<Service>(io_service) {}
+    : boost::asio::basic_io_object<Service>(io_service) {}
+
+  basic_async_queue(const basic_async_queue&) = delete;
+  basic_async_queue& operator=(const basic_async_queue&) = delete;
+
+  basic_async_queue(basic_async_queue&& other)
+      : boost::asio::basic_io_object<Service>(std::move(other)) {}
+
+  basic_async_queue& operator=(basic_async_queue&& other){
+    boost::asio::basic_io_object<Service>::operator=(std::move(other));
+    return *this;
+  }
 
   ~basic_async_queue() {}
 
   boost::system::error_code push(T element, boost::system::error_code& ec) {
-    return this->get_service().push(this->implementation, std::move(element),
-                                    ec);
+    return this->get_service().push(this->implementation,
+                                           std::move(element), ec);
   }
 
   template <class Handler>
@@ -54,8 +67,8 @@ class basic_async_queue : public boost::asio::basic_io_object<Service> {
   }
 
   template <class Handler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(Handler, void(boost::system::error_code, T))
-      async_get(Handler&& handler) {
+  BOOST_ASIO_INITFN_RESULT_TYPE(Handler, void(boost::system::error_code,
+                                              T)) async_get(Handler&& handler) {
     return this->get_service().async_get(this->implementation,
                                          std::forward<Handler>(handler));
   }
