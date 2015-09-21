@@ -22,8 +22,8 @@ class AckHistoryWindow {
  public:
   using PacketSequenceNumber = uint32_t;
   using AckSequenceNumber = uint32_t;
-  using TimePoint =
-      boost::chrono::time_point<boost::chrono::high_resolution_clock>;
+  using Clock = boost::chrono::high_resolution_clock;
+  using TimePoint = boost::chrono::time_point<Clock>;
 
  public:
   AckHistoryWindow(uint32_t size = 1024)
@@ -34,14 +34,12 @@ class AckHistoryWindow {
         ack_sequence_numbers_(size),
         ack_timestamps_(size) {}
 
-  void StoreAck(AckSequenceNumber ack_num,
-                PacketSequenceNumber packet_num) {
+  void StoreAck(AckSequenceNumber ack_num, PacketSequenceNumber packet_num) {
     boost::mutex::scoped_lock lock(mutex_);
     uint32_t window_size = packet_sequence_numbers_.size();
     ack_sequence_numbers_[current_index_] = ack_num;
     packet_sequence_numbers_[current_index_] = packet_num;
-    ack_timestamps_[current_index_] =
-        boost::chrono::high_resolution_clock::now();
+    ack_timestamps_[current_index_] = Clock::now();
     current_index_ = (current_index_ + 1) % window_size;
     if (current_index_ == oldest_index_) {
       oldest_index_ = (oldest_index_ + 1) % window_size;
@@ -59,7 +57,7 @@ class AckHistoryWindow {
         if (ack_sequence_numbers_[i] == ack_seq_num) {
           *p_packet_seq_num = packet_sequence_numbers_[i];
           *p_rtt = boost::chrono::duration_cast<boost::chrono::microseconds>(
-              boost::chrono::high_resolution_clock::now() - ack_timestamps_[i]);
+              Clock::now() - ack_timestamps_[i]);
 
           // Update last ack seq number ever ever being acknowledge
           if (i + 1 == current_index_) {
@@ -81,7 +79,7 @@ class AckHistoryWindow {
           i %= window_size;
           *p_packet_seq_num = packet_sequence_numbers_[i];
           *p_rtt = boost::chrono::duration_cast<boost::chrono::microseconds>(
-              boost::chrono::high_resolution_clock::now() - ack_timestamps_[i]);
+              Clock::now() - ack_timestamps_[i]);
 
           // Update last ack seq number ever ever being acknowledge
           if (i == current_index_) {

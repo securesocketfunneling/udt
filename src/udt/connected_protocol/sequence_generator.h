@@ -62,7 +62,7 @@ class SequenceGenerator {
 
   /// @return positive if lhs > rhs, negative if lhs < rhs
   int Compare(SeqNumber lhs, SeqNumber rhs) const {
-    return (static_cast<uint32_t>(abs(static_cast<int>(lhs - rhs))) <
+    return (static_cast<uint32_t>(std::abs(static_cast<int>(lhs - rhs))) <
             threshold_compare_)
                ? (lhs - rhs)
                : (rhs - lhs);
@@ -90,7 +90,7 @@ class SequenceGenerator {
   }
 
   int32_t SeqOffset(int32_t first, int32_t last) const {
-    if (abs(first - last) < static_cast<int32_t>(threshold_compare_)) {
+    if (std::abs(first - last) < static_cast<int32_t>(threshold_compare_)) {
       return last - first;
     }
 

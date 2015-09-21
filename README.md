@@ -110,5 +110,39 @@ cmake -DCMAKE_BUILD_TYPE=Release|Debug ../
 * Build project
 
 ```bash
-cmake --build PROJECT_PATH/build -- -j
+cmake --build . -- -j
+```
+
+### Build test executables on Mac OS
+
+* Go in project directory
+
+```bash
+cd PROJECT_PATH
+```
+
+* Copy Boost archive in ``third_party/boost``
+
+```bash
+cp boost_1_XX_Y.tar.bz2 PROJECT_PATH/third_party/boost
+```
+
+* Copy GTest archive in ``third_party/gtest``
+
+```bash
+cp gtest-1.X.Y.zip PROJECT_PATH/third_party/gtest
+```
+
+* Generate project
+
+```bash
+mkdir PROJECT_PATH/build
+cd PROJECT_PATH/build
+cmake ..
+```
+
+* Build project
+
+```bash
+cmake --build .
 ```

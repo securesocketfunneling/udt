@@ -140,7 +140,8 @@ class basic_ConnectionPayload {
           maximum_window_flow_size_(0),
           connection_type_(0),
           socket_id_(0),
-          syn_cookie_(0) {}
+          syn_cookie_(0),
+          peer_address_({{0, 0, 0, 0}}) {}
 
     uint32_t version_;
     uint32_t socket_type_;

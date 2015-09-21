@@ -80,15 +80,6 @@ class stream_socket_service : public boost::asio::detail::service_base<
     return ec;
   }
 
-  boost::system::error_code assign(implementation_type& impl,
-                                   const protocol_type& protocol,
-                                   const native_handle_type& native_socket,
-                                   boost::system::error_code& ec) {
-    ec.assign(::common::error::function_not_supported,
-              ::common::error::get_error_category());
-    return ec;
-  }
-
   bool is_open(const implementation_type& impl) const {
     return impl.p_multiplexer != nullptr || impl.p_session != nullptr;
   }

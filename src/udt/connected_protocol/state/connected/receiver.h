@@ -26,7 +26,7 @@ namespace connected_protocol {
 namespace state {
 namespace connected {
 
-template <class Protocol>
+template <class Protocol, class ConnectedState>
 class Receiver {
  private:
   using Clock = typename Protocol::clock;
@@ -49,6 +49,7 @@ class Receiver {
   Receiver(typename SocketSession::Ptr p_session)
       : mutex_(),
         p_session_(p_session),
+        p_state_(nullptr),
         lrsn_(0),
         loss_list_(),
         read_ops_mutex_(),
@@ -67,12 +68,14 @@ class Receiver {
         last_ack_number_(0),
         last_ack_timestamp_(Clock::now()) {}
 
-  void Init(PacketSequenceNumber initial_packet_seq_num) {
+  void Init(typename ConnectedState::Ptr p_state,
+            PacketSequenceNumber initial_packet_seq_num) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
     }
 
+    p_state_ = p_state;
     boost::mutex::scoped_lock lock(mutex_);
     last_exp_reset_timestamp_ = Clock::now();
 
@@ -93,15 +96,16 @@ class Receiver {
     }
   }
 
-  void Stop() { CloseReadOpsQueue(); }
+  void Stop() {
+    CloseReadOpsQueue();
+    p_state_.reset();
+  }
 
   void OnDataDatagram(DataDatagram *p_datagram) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
     }
-
-    boost::mutex::scoped_lock lock(mutex_);
 
     const auto &packet_seq_gen = p_session->packet_seq_gen();
     auto &header = p_datagram->header();
@@ -139,34 +143,38 @@ class Receiver {
       }
     }
 
-    if (packet_seq_gen.Compare(packet_seq_num,
-                               packet_seq_gen.Inc(lrsn_.load())) > 0) {
-      uint32_t i = packet_seq_gen.Inc(lrsn_.load());
-      while (i != packet_seq_num) {
-        loss_list_.insert(i);
-        i = packet_seq_gen.Inc(i);
+    {
+      boost::mutex::scoped_lock lock(mutex_);
+      if (packet_seq_gen.Compare(packet_seq_num,
+                                 packet_seq_gen.Inc(lrsn_.load())) > 0) {
+        uint32_t i = packet_seq_gen.Inc(lrsn_.load());
+        while (i != packet_seq_num) {
+          loss_list_.insert(i);
+          i = packet_seq_gen.Inc(i);
+        }
+
+        auto p_nack_dgr = std::make_shared<NAckDatagram>();
+        if (packet_seq_gen.Inc(lrsn_.load()) !=
+            packet_seq_gen.Dec(packet_seq_num)) {
+          p_nack_dgr->payload().AddLossRange(
+              packet_seq_gen.Inc(lrsn_.load()),
+              packet_seq_gen.Dec(packet_seq_num));
+        } else {
+          p_nack_dgr->payload().AddLossPacket(packet_seq_gen.Inc(lrsn_.load()));
+        }
+        // send nack datagram
+        p_session->AsyncSendControlPacket(
+            *p_nack_dgr, NAckDatagram::Header::NACK,
+            NAckDatagram::Header::NO_ADDITIONAL_INFO,
+            [p_session, p_nack_dgr](const boost::system::error_code &,
+                                    std::size_t) {});
+      } else if (packet_seq_gen.Compare(packet_seq_num, lrsn_.load()) < 0) {
+        loss_list_.erase(packet_seq_num);
       }
 
-      NAckDatagramPtr p_nack_dgr = std::make_shared<NAckDatagram>();
-      if (packet_seq_gen.Inc(lrsn_.load()) !=
-          packet_seq_gen.Dec(packet_seq_num)) {
-        p_nack_dgr->payload().AddLossRange(packet_seq_gen.Inc(lrsn_.load()),
-                                           packet_seq_gen.Dec(packet_seq_num));
-      } else {
-        p_nack_dgr->payload().AddLossPacket(packet_seq_gen.Inc(lrsn_.load()));
+      if (packet_seq_gen.Compare(packet_seq_num, lrsn_.load()) > 0) {
+        lrsn_ = packet_seq_num;
       }
-      // send nack datagram
-      p_session->AsyncSendControlPacket(
-          *p_nack_dgr, NAckDatagram::Header::NACK,
-          NAckDatagram::Header::NO_ADDITIONAL_INFO,
-          [p_session, p_nack_dgr](const boost::system::error_code &,
-                                  std::size_t) {});
-    } else if (packet_seq_gen.Compare(packet_seq_num, lrsn_.load()) < 0) {
-      loss_list_.erase(packet_seq_num);
-    }
-
-    if (packet_seq_gen.Compare(packet_seq_num, lrsn_.load()) > 0) {
-      lrsn_ = packet_seq_num;
     }
 
     {
@@ -174,8 +182,8 @@ class Receiver {
       packets_received_[packet_seq_num] = std::move(*p_datagram);
     }
 
-    p_session->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
-                                                 boost::system::error_code()));
+    p_session->get_io_service().post(boost::bind(
+        &Receiver::HandleQueues, this, boost::system::error_code(), p_state_));
   }
 
   void StoreAck(AckSequenceNumber ack_seq_num, PacketSequenceNumber ack_number,
@@ -235,8 +243,8 @@ class Receiver {
       boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
       read_ops_queue_.push(read_op);
     }
-    p_session->get_io_service().post(boost::bind(&Receiver::HandleQueues, this,
-                                                 boost::system::error_code()));
+    p_session->get_io_service().post(boost::bind(
+        &Receiver::HandleQueues, this, boost::system::error_code(), p_state_));
   }
 
   PacketSequenceNumber AckNumber(const SequenceGenerator &packet_seq_gen) {
@@ -292,9 +300,10 @@ class Receiver {
   }
 
  private:
-  void HandleQueues(boost::system::error_code &ec) {
+  void HandleQueues(const boost::system::error_code &ec,
+                    typename ConnectedState::Ptr p_state) {
     auto p_session = p_session_.lock();
-    if (!p_session) {
+    if (!p_session || !p_state_) {
       return;
     }
 
@@ -314,21 +323,20 @@ class Receiver {
 
     io::fixed_const_buffer_sequence packets_buffer;
 
-    auto begin_it(packets_received_.begin());
-    auto end_it(packets_received_.end());
-    auto current_packet_it(begin_it);
-    auto next_packet_it(begin_it);
+    auto begin_it = packets_received_.begin();
+    auto current_packet_it = begin_it;
+    auto next_packet_it = begin_it;
 
     if (last_buffer_seq_ != packet_seq_gen.Dec(current_packet_it->first)) {
       // wait the next seq number
       return;
     }
 
-    while (current_packet_it != end_it) {
+    while (current_packet_it != packets_received_.end()) {
       current_packet_it->second.payload().GetConstBuffers(&packets_buffer);
       ++next_packet_it;
       // end reached or gap in sequence number
-      if (next_packet_it == end_it ||
+      if (next_packet_it == packets_received_.end() ||
           (current_packet_it->first !=
            packet_seq_gen.Dec(next_packet_it->first))) {
         break;
@@ -343,10 +351,10 @@ class Receiver {
     std::size_t copied(read_op->fill_buffer(packets_buffer));
     std::size_t offset(copied);
     std::size_t buffer_size(0);
-    auto packet_it(begin_it);
+    auto packet_it = begin_it;
 
     // clean packets_received set
-    while (packet_it != end_it && offset > 0) {
+    while (packet_it != packets_received_.end() && offset > 0) {
       auto &payload = packet_it->second.payload();
       buffer_size = payload.GetSize();
       if (offset >= buffer_size) {
@@ -394,6 +402,8 @@ class Receiver {
   boost::mutex mutex_;
   // session
   std::weak_ptr<SocketSession> p_session_;
+  // owner state
+  typename ConnectedState::Ptr p_state_;
 
   // packet largest received sequence number
   std::atomic<PacketSequenceNumber> lrsn_;

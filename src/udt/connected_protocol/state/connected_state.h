@@ -57,7 +57,7 @@ class ConnectedState : public BaseState<Protocol>,
  private:
   using ClosedState = typename state::ClosedState<Protocol>;
   using Sender = typename connected::Sender<Protocol, ConnectedState>;
-  using Receiver = typename connected::Receiver<Protocol>;
+  using Receiver = typename connected::Receiver<Protocol, ConnectedState>;
 
  private:
   using PacketSequenceNumber = uint32_t;
@@ -80,7 +80,7 @@ class ConnectedState : public BaseState<Protocol>,
       return;
     }
 
-    receiver_.Init(p_session->init_packet_seq_num());
+    receiver_.Init(this->shared_from_this(), p_session->init_packet_seq_num());
     sender_.Init(this->shared_from_this(), &congestion_control_);
     congestion_control_.Init(p_session->init_packet_seq_num(),
                              p_session->max_window_flow_size());
@@ -208,7 +208,7 @@ class ConnectedState : public BaseState<Protocol>,
       }
       case ControlDatagram::Header::SHUTDOWN:
         ResetExp(false);
-        Close();
+        this->Close();
         break;
       case ControlDatagram::Header::ACK_OF_ACK: {
         ResetExp(false);
@@ -482,21 +482,28 @@ class ConnectedState : public BaseState<Protocol>,
     const auto& packet_seq_gen = p_session->packet_seq_gen();
     auto& header = ack_dgr.header();
     auto& payload = ack_dgr.payload();
-    PacketSequenceNumber packet_ack_number =
-        GetPacketSequenceValue(payload.max_packet_sequence_number());
     AckSequenceNumber ack_seq_num = header.additional_info();
 
     if (Logger::ACTIVE) {
       ack_count_ = ack_count_.load() + 1;
     }
 
-    sender_.AckPackets(packet_ack_number);
-
-    receiver_.set_last_ack2_seq_number(ack_seq_num);
+    // Send ACK2 immediatly (RTT computing)
     AckOfAckDatagramPtr p_ack2_dgr = std::make_shared<AckOfAckDatagram>();
     p_session->AsyncSendControlPacket(
         *p_ack2_dgr, AckOfAckDatagram::Header::ACK_OF_ACK, ack_seq_num,
-        [self, p_ack2_dgr](const boost::system::error_code&, std::size_t) {});
+        [self, p_ack2_dgr](const boost::system::error_code&, std::size_t) {
+          if (Logger::ACTIVE) {
+            self->ack2_sent_count_ = self->ack2_sent_count_.load() + 1;
+          }
+        });
+
+    PacketSequenceNumber packet_ack_number =
+        GetPacketSequenceValue(payload.max_packet_sequence_number());
+    // Ack packets which have been received
+    sender_.AckPackets(packet_ack_number);
+
+    receiver_.set_last_ack2_seq_number(ack_seq_num);
 
     if (payload.IsLightAck()) {
       if (packet_seq_gen.Compare(packet_ack_number,
@@ -505,6 +512,7 @@ class ConnectedState : public BaseState<Protocol>,
         // available buffer size in packets
         int32_t offset = packet_seq_gen.SeqOffset(
             receiver_.largest_acknowledged_seq_number(), packet_ack_number);
+        // update remote window flow
         p_session->set_window_flow_size(p_session->window_flow_size() - offset);
         receiver_.set_largest_acknowledged_seq_number(packet_ack_number);
       }
@@ -512,8 +520,9 @@ class ConnectedState : public BaseState<Protocol>,
     }
 
     p_session->get_p_connection_info()->UpdateRTT(payload.rtt());
-    uint32_t rtt_var = static_cast<uint32_t>(abs(
-        (long long)payload.rtt() - p_session->connection_info().rtt().count()));
+    uint32_t rtt_var = static_cast<uint32_t>(
+        std::abs(static_cast<long long>(payload.rtt()) -
+                 p_session->connection_info().rtt().count()));
     p_session->get_p_connection_info()->UpdateRTTVar(rtt_var);
     p_session->get_p_connection_info()->UpdateAckPeriod();
     p_session->get_p_connection_info()->UpdateNAckPeriod();
@@ -581,7 +590,7 @@ class ConnectedState : public BaseState<Protocol>,
 
       p_session->get_p_connection_info()->UpdateRTT(rtt.count());
       uint64_t rtt_var =
-          abs(p_session->connection_info().rtt().count() - rtt.count());
+          std::abs(p_session->connection_info().rtt().count() - rtt.count());
       p_session->get_p_connection_info()->UpdateRTTVar(rtt_var);
 
       p_session->get_p_connection_info()->UpdateAckPeriod();

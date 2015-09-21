@@ -14,7 +14,6 @@
 #include "udt/common/error/error.h"
 
 #include "udt/connected_protocol/io/accept_op.h"
-#include "udt/connected_protocol/common/observer.h"
 
 #include "udt/connected_protocol/state/base_state.h"
 #include "udt/connected_protocol/state/accepting_state.h"
@@ -23,8 +22,7 @@
 namespace connected_protocol {
 
 template <class Protocol>
-class AcceptorSession
-    : public common::Observer<typename Protocol::socket_session> {
+class AcceptorSession {
  private:
   using TimePoint = typename Protocol::time_point;
   using Clock = typename Protocol::clock;
@@ -38,7 +36,6 @@ class AcceptorSession
   using ConnectionDatagramPtr = std::shared_ptr<ConnectionDatagram>;
   using ClosedState = typename state::ClosedState<Protocol>;
   using AcceptingState = typename state::AcceptingState<Protocol>;
-  using Observer = typename common::Observer<SocketSession>;
   using AcceptOp = typename io::basic_pending_accept_operation<Protocol>;
   using AcceptOpQueue = boost::asio::detail::op_queue<AcceptOp>;
 
@@ -97,16 +94,18 @@ class AcceptorSession
       return;
     }
 
+    boost::recursive_mutex::scoped_lock lock(mutex_);
+
     StopListen();
 
     for (auto& previous_connected_session_pair : previous_connected_sessions_) {
-      previous_connected_session_pair.second->RemoveObserver(this);
+      previous_connected_session_pair.second->RemoveAcceptor();
     }
     for (auto& connected_session_pair : connected_sessions_) {
-      connected_session_pair.second->RemoveObserver(this);
+      connected_session_pair.second->RemoveAcceptor();
     }
     for (auto& connecting_session_pair : connecting_sessions_) {
-      connecting_session_pair.second->RemoveObserver(this);
+      connecting_session_pair.second->RemoveAcceptor();
     }
 
     boost::system::error_code ec(::common::error::interrupted,
@@ -130,7 +129,6 @@ class AcceptorSession
       return;
     }
 
-    boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
     if (!listening_) {
       // Not listening, drop packet
       return;
@@ -160,6 +158,7 @@ class AcceptorSession
       }
 
       // New connection
+      boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
       boost::system::error_code ec;
       p_socket_session =
           p_multiplexer_->CreateSocketSession(ec, *p_remote_endpoint);
@@ -169,7 +168,7 @@ class AcceptorSession
 
       p_socket_session->set_remote_socket_id(remote_socket_id);
       p_socket_session->set_syn_cookie(server_cookie);
-      p_socket_session->AddObserver(this);
+      p_socket_session->SetAcceptor(this);
       p_socket_session->ChangeState(AcceptingState::Create(p_socket_session));
 
       connecting_sessions_[remote_socket_id] = p_socket_session;
@@ -178,7 +177,7 @@ class AcceptorSession
     p_socket_session->PushConnectionDgr(p_connection_dgr);
   }
 
-  virtual void Notify(typename Protocol::socket_session* p_subject) {
+  void Notify(typename Protocol::socket_session* p_subject) {
     if (p_subject->GetState() ==
         connected_protocol::state::BaseState<Protocol>::CONNECTED) {
       boost::recursive_mutex::scoped_lock lock_sessions(mutex_);

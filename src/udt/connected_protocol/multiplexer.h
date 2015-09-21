@@ -249,11 +249,11 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       return;
     }
 
-    auto p_generic_packet = std::make_shared<GenericDatagram>();
-    auto p_next_remote_endpoint = std::make_shared<NextEndpoint>();
-
     {
       boost::mutex::scoped_lock lock_socket(socket_mutex_);
+      auto p_generic_packet = std::make_shared<GenericDatagram>();
+      auto p_next_remote_endpoint = std::make_shared<NextEndpoint>();
+
       socket_.async_receive_from(
           p_generic_packet->GetMutableBuffers(), *p_next_remote_endpoint,
           boost::bind(&Multiplexer::HandlePacket, this->shared_from_this(),
@@ -282,6 +282,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     if (header.IsDataPacket()) {
       if (!p_socket_session_optional) {
         // Drop datagram if no session found
+        p_generic_packet.reset();
         ReadPacket();
         return;
       }
@@ -292,6 +293,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       auto &data_payload = data_datagram.payload();
       auto &received_payload = p_generic_packet->payload();
       data_payload = std::move(received_payload);
+      p_generic_packet.reset();
       // Forward DataDatagram
       (*p_socket_session_optional)->PushDataDgr(&data_datagram);
       ReadPacket();
@@ -299,7 +301,6 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
 
     if (header.IsControlPacket()) {
-      ReadPacket();
       ControlDatagram control_datagram;
       boost::asio::buffer_copy(control_datagram.GetMutableBuffers(),
                                p_generic_packet->GetConstBuffers());
@@ -309,10 +310,12 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
         auto p_connection_datagram = std::make_shared<ConnectionDatagram>();
         boost::asio::buffer_copy(p_connection_datagram->GetMutableBuffers(),
                                  control_datagram.GetConstBuffers());
+        p_generic_packet.reset();
 
         if (p_socket_session_optional) {
           (*p_socket_session_optional)
               ->PushConnectionDgr(p_connection_datagram);
+          ReadPacket();
           return;
         }
 
@@ -322,6 +325,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
           if (p_acceptor_) {
             p_acceptor_->PushConnectionDgr(p_connection_datagram,
                                            p_next_remote_endpoint);
+            ReadPacket();
             return;
           }
         }
@@ -330,10 +334,12 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       } else {
         if (!p_socket_session_optional) {
           // Drop datagram
+          ReadPacket();
           return;
         }
         // Forward ControlDatagram
         (*p_socket_session_optional)->PushControlDgr(&control_datagram);
+        ReadPacket();
       }
     }
   }

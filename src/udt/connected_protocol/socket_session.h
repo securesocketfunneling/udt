@@ -12,7 +12,7 @@
 #include <boost/asio/socket_base.hpp>
 
 #include <boost/chrono.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 #include "udt/connected_protocol/io/connect_op.h"
 #include "udt/connected_protocol/io/write_op.h"
@@ -20,8 +20,6 @@
 
 #include "udt/connected_protocol/cache/connection_info.h"
 #include "udt/connected_protocol/cache/connections_info_manager.h"
-
-#include "udt/connected_protocol/common/observer.h"
 
 #include "udt/connected_protocol/logger/log_entry.h"
 
@@ -42,9 +40,9 @@ class SocketSession
  private:
   using MultiplexerPtr = std::shared_ptr<typename Protocol::multiplexer>;
   using FlowPtr = std::shared_ptr<typename Protocol::flow>;
+  using AcceptorSession = typename Protocol::acceptor_session;
   using ConnectionInfo = cache::ConnectionInfo;
   using ConnectionInfoPtr = cache::ConnectionInfo::Ptr;
-  using SessionObserver = typename common::Observer<SocketSession>;
   using ClosedState = state::ClosedState<Protocol>;
   using BaseStatePtr =
       typename connected_protocol::state::BaseState<Protocol>::Ptr;
@@ -178,24 +176,26 @@ class SocketSession
   }
 
   // State management
-  void AddObserver(SessionObserver* p_observer) {
-    boost::mutex::scoped_lock lock(mutex_);
-    observers_.insert(p_observer);
+  void SetAcceptor(AcceptorSession* p_acceptor) {
+    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    p_acceptor_ = p_acceptor;
   }
 
-  void RemoveObserver(SessionObserver* p_observer) {
-    boost::mutex::scoped_lock lock(mutex_);
-    observers_.erase(p_observer);
+  void RemoveAcceptor() {
+    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    p_acceptor_ = nullptr;
   }
 
   // Change session's current state
   void ChangeState(BaseStatePtr p_new_state) {
-    if (p_state_) {
-      p_state_->Stop();
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    auto p_state = p_state_;
+    if (p_state) {
+      p_state->Stop();
     }
     p_state_ = std::move(p_new_state);
     p_state_->Init();
-    NotifyObservers();
+    NotifyAcceptor();
   }
 
   void Unbind() {
@@ -211,21 +211,21 @@ class SocketSession
   SocketId socket_id() const { return socket_id_; }
 
   void set_socket_id(SocketId socket_id) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     socket_id_ = socket_id;
   }
 
   SocketId remote_socket_id() const { return remote_socket_id_; }
 
   void set_remote_socket_id(SocketId remote_socket_id) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     remote_socket_id_ = remote_socket_id;
   }
 
   uint32_t syn_cookie() const { return syn_cookie_; }
 
   void set_syn_cookie(uint32_t syn_cookie) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     syn_cookie_ = syn_cookie;
   }
 
@@ -242,14 +242,14 @@ class SocketSession
   const SequenceGenerator& packet_seq_gen() const { return packet_seq_gen_; }
 
   void set_timeout_delay(uint32_t delay) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     timeout_delay_ = delay;
   }
 
   uint32_t timeout_delay() const { return timeout_delay_; }
 
   void set_start_timestamp(const TimePoint& start) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     start_timestamp_ = start;
   }
 
@@ -258,21 +258,21 @@ class SocketSession
   uint32_t max_window_flow_size() const { return max_window_flow_size_; }
 
   void set_max_window_flow_size(uint32_t max_window_flow_size) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     max_window_flow_size_ = max_window_flow_size;
   }
 
   uint32_t window_flow_size() const { return window_flow_size_; }
 
   void set_window_flow_size(uint32_t window_flow_size) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     window_flow_size_ = window_flow_size;
   }
 
   uint32_t init_packet_seq_num() const { return init_packet_seq_num_; }
 
   void set_init_packet_seq_num(uint32_t init_packet_seq_num) {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     init_packet_seq_num_ = init_packet_seq_num;
   }
 
@@ -281,7 +281,7 @@ class SocketSession
   ConnectionInfo* get_p_connection_info() { return &connection_info_; }
 
   void UpdateCacheConnection() {
-    boost::mutex::scoped_lock lock_session(mutex_);
+    boost::recursive_mutex::scoped_lock lock_session(mutex_);
     auto connection_cache = p_connection_info_cache_.lock();
     if (connection_cache) {
       connection_cache->Update(connection_info_);
@@ -297,7 +297,8 @@ class SocketSession
       : mutex_(),
         p_multiplexer_(std::move(p_multiplexer)),
         p_flow_(std::move(p_fl)),
-        observers_(),
+        acceptor_mutex_(),
+        p_acceptor_(nullptr),
         p_state_(ClosedState::Create(p_multiplexer_->get_io_service())),
         socket_id_(0),
         remote_socket_id_(0),
@@ -377,18 +378,19 @@ class SocketSession
             .count()));
   }
 
-  void NotifyObservers() {
-    boost::mutex::scoped_lock lock(mutex_);
-    for (auto& p_observer : observers_) {
-      p_observer->Notify(this);
+  void NotifyAcceptor() {
+    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    if (p_acceptor_) {
+      p_acceptor_->Notify(this);
     }
   }
 
  private:
-  boost::mutex mutex_;
+  boost::recursive_mutex mutex_;
   MultiplexerPtr p_multiplexer_;
   FlowPtr p_flow_;
-  std::set<SessionObserver*> observers_;
+  boost::recursive_mutex acceptor_mutex_;
+  AcceptorSession* p_acceptor_;
   BaseStatePtr p_state_;
   SocketId socket_id_;
   SocketId remote_socket_id_;
