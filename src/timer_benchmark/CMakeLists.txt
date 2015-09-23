@@ -4,6 +4,8 @@ set(project_NAME "timer_benchmark")
 project(${project_NAME})
 
 set(TIMER_FILES
+      high_precision_timer_scheduler.hpp
+      detail/high_precision_timer_scheduler.ipp
       main.cpp)
 
 include_directories(

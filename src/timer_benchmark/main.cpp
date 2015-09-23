@@ -1,3 +1,5 @@
+#define BOOST_ASIO_HAS_STD_MUTEX_AND_CONDVAR
+
 #include <future>
 #include <iostream>
 
@@ -8,6 +10,8 @@
 #include <boost/asio/basic_waitable_timer.hpp>
 
 #include <boost/thread.hpp>
+#include <timer_benchmark/high_precision_timer_scheduler.hpp>
+
 
 using Accumulator = boost::accumulators::accumulator_set<
     int, boost::accumulators::features<
@@ -19,9 +23,12 @@ void DisplayStatistics(const Accumulator& statistics, int expected_wait);
 int main(int argc, char* argv[]) {
   namespace chrono = boost::chrono;
   using Clock = chrono::high_resolution_clock;
-  using ClockTimer = boost::asio::basic_waitable_timer<Clock>;
+  using ClockTimer = boost::asio::basic_waitable_timer<
+      Clock, boost::asio::wait_traits<Clock>, high_precision_timer_scheduler>;
+
   using ClockTimePoint = chrono::time_point<Clock>;
   using TimerHandler = std::function<void(const boost::system::error_code&)>;
+
 
   if (argc < 3) {
     std::cout << "timer_benchmark [wait_usec] [sample_size]" << std::endl;
