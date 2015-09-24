@@ -33,7 +33,7 @@ TEST(UDTTest, UDTTestMultipleConnections) {
   udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
 
   TestMultipleConnections<udt_protocol>(
-      client_local_udt_query, client_udt_query, acceptor_udt_query, 200);
+      client_local_udt_query, client_udt_query, acceptor_udt_query, 200, 100);
 }
 
 TEST(UDTTest, UDTProtocolLightExchangeTest) {

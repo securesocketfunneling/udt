@@ -28,7 +28,7 @@ void TestMultipleConnections(
     const typename StreamProtocol::resolver::query& client_local_query,
     const typename StreamProtocol::resolver::query& client_query,
     const typename StreamProtocol::resolver::query& acceptor_query,
-    uint64_t max_connections) {
+    uint64_t max_connections, int max_listening) {
   boost::asio::io_service io_service;
   boost::system::error_code resolve_ec;
 
@@ -45,9 +45,13 @@ void TestMultipleConnections(
   typename StreamProtocol::acceptor acceptor(io_service);
   typename StreamProtocol::resolver resolver(io_service);
 
-  std::vector<typename StreamProtocol::socket> sockets;
-  for (int i = 0; i < 2 * max_connections; ++i) {
-    sockets.emplace_back(io_service);
+  std::vector<typename StreamProtocol::socket> connected_sockets;
+  std::vector<typename StreamProtocol::socket> accepted_sockets;
+  for (int i = 0; i < max_connections; ++i) {
+    connected_sockets.emplace_back(io_service);
+  }
+  for (int i = 0; i < max_listening; ++i) {
+    accepted_sockets.emplace_back(io_service);
   }
 
   auto acceptor_endpoint_it = resolver.resolve(acceptor_query, resolve_ec);
@@ -78,7 +82,7 @@ void TestMultipleConnections(
     }
     if (!accepted_strike) {
       ++count_acceptor;
-      if (count_acceptor == max_connections) {
+      if (count_acceptor == max_listening) {
         accepted_ok.set_value(true);
       }
     }
@@ -105,24 +109,20 @@ void TestMultipleConnections(
   acceptor.bind(acceptor_endpoint, ec);
   ASSERT_EQ(0, ec.value()) << "Bind acceptor should not be in error: "
                            << ec.message();
-  acceptor.listen(100, ec);
+  acceptor.listen(max_listening, ec);
   ASSERT_EQ(0, ec.value()) << "Listen acceptor should not be in error: "
                            << ec.message();
 
-  std::cout << "Async connect " << max_connections
+  std::cout << " * Async connect " << max_connections
             << " sockets to a single acceptor" << std::endl;
 
-  for (int i = 0; i < 2 * max_connections; i = i + 2) {
+  for (int i = 0; i < max_connections; ++i) {
     boost::system::error_code bind_ec;
-    sockets[i].bind(local_endpoint, bind_ec);
+    connected_sockets[i].bind(local_endpoint, bind_ec);
     ASSERT_EQ(0, ec.value())
         << "Bind socket to local endpoint should not be in error: "
         << ec.message();
-    sockets[i].async_connect(remote_endpoint, connected);
-  }
-
-  for (int i = 1; i < 2 * max_connections; i = i + 2) {
-    acceptor.async_accept(sockets[i], accepted);
+    connected_sockets[i].async_connect(remote_endpoint, connected);
   }
 
   boost::thread_group threads;
@@ -130,12 +130,20 @@ void TestMultipleConnections(
     threads.create_thread([&io_service]() { io_service.run(); });
   }
 
-  ASSERT_TRUE(accepted_ok.get_future().get()) << "Accepted all sessions NOK "
-                                              << count_acceptor << "/"
-                                              << max_connections;
   ASSERT_TRUE(connected_ok.get_future().get()) << "Connected all sessions NOK "
                                                << count_connected << "/"
                                                << max_connections;
+
+  std::cout << " * Async accept " << max_listening << " sockets on the acceptor"
+            << std::endl;
+
+  for (int i = 0; i < max_listening; ++i) {
+    acceptor.async_accept(accepted_sockets[i], accepted);
+  }
+
+  ASSERT_TRUE(accepted_ok.get_future().get()) << "Accepted all sessions NOK "
+                                              << count_acceptor << "/"
+                                              << max_connections;
 
   boost::system::error_code acceptor_close_ec;
   acceptor.close(acceptor_close_ec);
@@ -143,19 +151,19 @@ void TestMultipleConnections(
       << "Closing acceptor should not be in error: "
       << acceptor_close_ec.message();
 
-  std::cout << "Closing accepted sockets" << std::endl;
-  for (int i = 1; i < 2 * max_connections; i = i + 2) {
+  std::cout << " * Closing accepted sockets" << std::endl;
+  for (int i = 0; i < max_listening; ++i) {
     boost::system::error_code close_ec;
-    sockets[i].close(close_ec);
+    accepted_sockets[i].close(close_ec);
     ASSERT_EQ(0, close_ec.value())
         << "Closing accepted socket should not be in error: "
         << close_ec.message();
   }
 
-  std::cout << "Closing connected sockets" << std::endl;
-  for (int i = 0; i < 2 * max_connections; i = i + 2) {
+  std::cout << " * Closing connected sockets" << std::endl;
+  for (int i = 0; i < max_connections; ++i) {
     boost::system::error_code close_ec;
-    sockets[i].close(close_ec);
+    connected_sockets[i].close(close_ec);
     ASSERT_EQ(0, close_ec.value())
         << "Closing connected socket should not be in error: "
         << close_ec.message();

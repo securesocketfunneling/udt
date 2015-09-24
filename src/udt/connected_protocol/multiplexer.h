@@ -31,9 +31,6 @@ namespace connected_protocol {
 template <class Protocol>
 class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
  private:
-  enum { MAX_THREADS_IO_SERVICE_TIMER = 1 };
-
- private:
   using protocol_type = Protocol;
   using Logger = typename Protocol::logger;
   using NextSocket = typename protocol_type::next_layer_protocol::socket;
@@ -149,6 +146,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   void SetAcceptor(boost::system::error_code &ec,
                    AcceptorSessionPtr p_acceptor) {
+    boost::mutex::scoped_lock lock_acceptor(acceptor_mutex_);
     if (p_acceptor_) {
       ec.assign(::common::error::address_in_use,
                 ::common::error::get_error_category());
@@ -163,7 +161,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   void RemoveAcceptor() {
     boost::recursive_mutex::scoped_lock lock_sessions(sessions_mutex_);
-    boost::recursive_mutex::scoped_lock lock_acceptor(acceptor_mutex_);
+    boost::mutex::scoped_lock lock_acceptor(acceptor_mutex_);
+
     p_acceptor_.reset();
 
     if (remote_endpoint_flow_sessions_.empty() && !p_acceptor_) {
@@ -268,7 +267,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       return;
     }
 
-    p_generic_packet->payload().SetSize(length - GenericDatagram::Header::size);
+    p_generic_packet->payload().SetSize(static_cast<uint32_t>(length) -
+                                        GenericDatagram::Header::size);
 
     if (ec) {
       ReadPacket();
@@ -320,16 +320,15 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
         }
 
         {
-          boost::recursive_mutex::scoped_lock(acceptor_mutex_);
+          boost::mutex::scoped_lock lock(acceptor_mutex_);
           // Check if acceptor exists
           if (p_acceptor_) {
             p_acceptor_->PushConnectionDgr(p_connection_datagram,
                                            p_next_remote_endpoint);
-            ReadPacket();
-            return;
           }
         }
 
+        ReadPacket();
         // Drop connection datagram
       } else {
         if (!p_socket_session_optional) {
@@ -425,7 +424,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   FlowsMap flows_;
   boost::recursive_mutex sessions_mutex_;
   RemoteEndpointFlowMap remote_endpoint_flow_sessions_;
-  boost::recursive_mutex acceptor_mutex_;
+  boost::mutex acceptor_mutex_;
   AcceptorSessionPtr p_acceptor_;
   boost::random::mt19937 gen_;
   std::atomic<uint32_t> sent_count_;

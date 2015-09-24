@@ -104,6 +104,7 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
     }
 
     impl.p_acceptor->Close();
+    impl.p_multiplexer->RemoveAcceptor();
     impl.p_acceptor.reset();
     impl.p_multiplexer.reset();
 
