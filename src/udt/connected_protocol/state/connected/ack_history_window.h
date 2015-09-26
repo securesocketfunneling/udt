@@ -36,7 +36,8 @@ class AckHistoryWindow {
 
   void StoreAck(AckSequenceNumber ack_num, PacketSequenceNumber packet_num) {
     boost::mutex::scoped_lock lock(mutex_);
-    uint32_t window_size = packet_sequence_numbers_.size();
+    uint32_t window_size =
+        static_cast<uint32_t>(packet_sequence_numbers_.size());
     ack_sequence_numbers_[current_index_] = ack_num;
     packet_sequence_numbers_[current_index_] = packet_num;
     ack_timestamps_[current_index_] = Clock::now();
@@ -50,7 +51,8 @@ class AckHistoryWindow {
                    PacketSequenceNumber* p_packet_seq_num,
                    boost::chrono::microseconds* p_rtt) {
     boost::mutex::scoped_lock lock(mutex_);
-    uint32_t window_size = packet_sequence_numbers_.size();
+    uint32_t window_size =
+        static_cast<uint32_t>(packet_sequence_numbers_.size());
     if (current_index_ >= oldest_index_) {
       for (uint32_t i = oldest_index_, newest_index = current_index_;
            i < newest_index; ++i) {

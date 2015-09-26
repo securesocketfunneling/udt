@@ -14,6 +14,7 @@
 #include <boost/bind.hpp>
 
 #include <boost/system/error_code.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 #include "udt/connected_protocol/logger/log_entry.h"
 

@@ -204,7 +204,7 @@ class Receiver {
   // @return buffer size in bytes
   uint32_t AvailableReceiveBufferSize() {
     boost::mutex::scoped_lock lock(packets_received_mutex_);
-    return max_received_size_ - packets_received_.size();
+    return max_received_size_ - static_cast<uint32_t>(packets_received_.size());
   }
 
   double GetPacketArrivalSpeed() {
@@ -365,7 +365,7 @@ class Receiver {
       } else {
         // partial consuming
         last_buffer_seq_ = packet_seq_gen.Dec(packet_it->first);
-        payload.SetOffset(offset);
+        payload.SetOffset(static_cast<uint32_t>(offset));
         offset = 0;
       }
     }

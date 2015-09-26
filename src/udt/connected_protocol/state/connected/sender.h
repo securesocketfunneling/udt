@@ -428,7 +428,7 @@ class Sender {
         ++current_payload_it;
         ++user_buf_current_it;
       }
-      payload.SetSize(copy_length);
+      payload.SetSize(static_cast<uint32_t>(copy_length));
       // complete packet header
       header.set_message_number(message_seq_number);
       header.set_destination_socket(p_session->remote_socket_id());
