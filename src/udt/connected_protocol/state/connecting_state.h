@@ -30,7 +30,7 @@ class ConnectingState
       public std::enable_shared_from_this<ConnectingState<Protocol>> {
  public:
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
+  using BasicTimer = typename Protocol::basic_timer;
 
   using Ptr = std::shared_ptr<ConnectingState>;
   using SocketSession = typename Protocol::socket_session;
@@ -211,7 +211,6 @@ class ConnectingState
           if (!p_session) {
             return;
           }
-
           if (ec) {
             // Timer was stopped or destroyed
             return;
@@ -272,8 +271,8 @@ class ConnectingState
  private:
   std::weak_ptr<SocketSession> p_session_;
   io::basic_pending_connect_operation<Protocol> *p_connection_op_;
-  Timer send_timer_;
-  Timer timeout_timer_;
+  BasicTimer send_timer_;
+  BasicTimer timeout_timer_;
   bool stop_sending_;
 };
 

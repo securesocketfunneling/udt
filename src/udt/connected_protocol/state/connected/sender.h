@@ -32,7 +32,6 @@ class Sender {
 
  private:
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
   using TimePoint = typename Protocol::time_point;
   using CongestionControl = typename Protocol::congestion_control;
   using SocketSession = typename Protocol::socket_session;

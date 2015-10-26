@@ -34,6 +34,9 @@
 #include "udt/connected_protocol/stream_socket_service.h"
 #include "udt/connected_protocol/socket_acceptor_service.h"
 
+#include "udt/timer/basic_waitable_timer.hpp"
+#include "udt/timer/high_precision_timer_scheduler.hpp"
+
 namespace connected_protocol {
 
 template <class NextLayer, class Logger = logger::NoLog,
@@ -55,7 +58,10 @@ class Protocol {
   // Clock
   using clock = boost::chrono::high_resolution_clock;
   using time_point = clock::time_point;
-  using timer = boost::asio::basic_waitable_timer<clock>;
+  using basic_timer = boost::asio::basic_waitable_timer<clock>;
+  using timer = udt::timer::basic_waitable_timer<
+      clock, boost::asio::wait_traits<clock>,
+      udt::timer::high_precision_timer_scheduler>;
 
   // Socket options
   enum socket_options { TIMEOUT_DELAY };

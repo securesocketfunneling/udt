@@ -30,7 +30,6 @@ template <class Protocol, class ConnectedState>
 class Receiver {
  private:
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
   using TimePoint = typename Protocol::time_point;
   using ReadOpsQueue =
       std::queue<io::basic_pending_stream_read_operation<Protocol> *>;

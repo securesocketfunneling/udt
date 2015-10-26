@@ -26,6 +26,12 @@ file(GLOB_RECURSE QUEUE_HEADER_FILES
 file(GLOB_RECURSE QUEUE_SOURCE_FILES
       "${project_SRC_DIR}/udt/queue/*.cpp")
 
+file(GLOB_RECURSE TIMER_HEADER_FILES
+      "${project_SRC_DIR}/udt/timer/*.hpp")
+    
+file(GLOB_RECURSE TIMER_SOURCE_FILES
+      "${project_SRC_DIR}/udt/timer/*.cpp")
+      
 file(GLOB_RECURSE CONNECTED_PROTOCOL_HEADER_FILES
       "${project_SRC_DIR}/udt/connected_protocol/*.h")
 

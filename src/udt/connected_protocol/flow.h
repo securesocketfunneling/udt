@@ -189,6 +189,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
       if (Logger::ACTIVE) {
         sent_count_ = sent_count_.load() + 1;
       }
+
       auto self = this->shared_from_this();
       p_session->AsyncSendPacket(
           p_datagram, [p_datagram](const boost::system::error_code& ec,

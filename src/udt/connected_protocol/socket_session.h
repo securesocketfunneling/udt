@@ -50,7 +50,7 @@ class SocketSession
  private:
   using TimePoint = typename Protocol::time_point;
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
+  using BasicTimer = typename Protocol::basic_timer;
   using Logger = typename Protocol::logger;
 
  private:
@@ -410,7 +410,7 @@ class SocketSession
   ConnectionInfo connection_info_;
   std::weak_ptr<ConnectionInfo> p_connection_info_cache_;
   /// Logger
-  Timer logger_timer_;
+  BasicTimer logger_timer_;
   Logger logger_;
 
  private:

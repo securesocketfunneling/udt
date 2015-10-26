@@ -19,6 +19,8 @@ add_target("timer_benchmark"
     HEADER_FILTER   "\\.h(h|m|pp|xx|\\+\\+)?" 
   FILES
     ${TIMER_FILES}
+    ${TIMER_HEADER_FILES}
+    ${TIMER_SOURCE_FILES}
 )
 
 target_link_libraries(timer_benchmark ${Boost_LIBRARIES} ${PLATFORM_SPECIFIC_LIB_DEP})

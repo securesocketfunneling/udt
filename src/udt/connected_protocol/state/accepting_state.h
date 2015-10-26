@@ -30,7 +30,7 @@ class AcceptingState
   using ClosedState = typename state::ClosedState<Protocol>;
 
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
+  using BasicTimer = typename Protocol::basic_timer;
   using TimePoint = typename Protocol::time_point;
 
   using ConnectedState = typename state::ConnectedState<
@@ -156,7 +156,7 @@ class AcceptingState
 
  private:
   std::weak_ptr<SocketSession> p_session_;
-  Timer timeout_timer_;
+  BasicTimer timeout_timer_;
 };
 
 }  // state

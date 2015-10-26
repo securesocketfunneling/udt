@@ -33,7 +33,7 @@ class ConnectedState : public BaseState<Protocol>,
   using CongestionControl = typename Protocol::congestion_control;
   using SocketSession = typename Protocol::socket_session;
   using Clock = typename Protocol::clock;
-  using Timer = typename Protocol::timer;
+  using BasicTimer = typename Protocol::basic_timer;
   using TimePoint = typename Protocol::time_point;
   using Logger = typename Protocol::logger;
 
@@ -630,9 +630,9 @@ class ConnectedState : public BaseState<Protocol>,
   bool unqueue_write_op_;
   CongestionControl congestion_control_;
   std::atomic<bool> stop_timers_;
-  Timer ack_timer_;
-  Timer nack_timer_;
-  Timer exp_timer_;
+  BasicTimer ack_timer_;
+  BasicTimer nack_timer_;
+  BasicTimer exp_timer_;
   std::atomic<bool> closed_;
   std::atomic<uint32_t> nack_count_;
   std::atomic<uint32_t> ack_count_;

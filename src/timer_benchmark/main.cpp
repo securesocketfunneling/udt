@@ -1,13 +1,15 @@
 #include <future>
 #include <iostream>
+#include <vector>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics.hpp>
-#include <boost/chrono.hpp>
-
 #include <boost/asio/basic_waitable_timer.hpp>
-
+#include <boost/chrono.hpp>
 #include <boost/thread.hpp>
+
+#include "udt/timer/basic_waitable_timer.hpp"
+#include "udt/timer/high_precision_timer_scheduler.hpp"
 
 using Accumulator = boost::accumulators::accumulator_set<
     int, boost::accumulators::features<
@@ -19,9 +21,14 @@ void DisplayStatistics(const Accumulator& statistics, int expected_wait);
 int main(int argc, char* argv[]) {
   namespace chrono = boost::chrono;
   using Clock = chrono::high_resolution_clock;
-  using ClockTimer = boost::asio::basic_waitable_timer<Clock>;
+  using ClockTimer = udt::timer::basic_waitable_timer<
+      Clock, boost::asio::wait_traits<Clock>,
+      udt::timer::high_precision_timer_scheduler>;
+  //using ClockTimer = boost::asio::basic_waitable_timer<Clock>;
+  using TimerPtr = std::shared_ptr<ClockTimer>;
   using ClockTimePoint = chrono::time_point<Clock>;
-  using TimerHandler = std::function<void(const boost::system::error_code&)>;
+  using TimerHandler =
+      std::function<void(uint32_t, const boost::system::error_code&)>;
 
   if (argc < 3) {
     std::cout << "timer_benchmark [wait_usec] [sample_size]" << std::endl;
@@ -29,39 +36,56 @@ int main(int argc, char* argv[]) {
   }
 
   boost::asio::io_service io_service;
-  int count = 0;
-  int wait_usec = atoi(argv[1]);
-  int sample_size = atoi(argv[2]);
+  std::unique_ptr<boost::asio::io_service::work> p_worker(
+      new boost::asio::io_service::work(io_service));
+  std::atomic<int> timeout_count(0);
+  bool wait_set = false;
   std::promise<bool> wait_end;
   Accumulator statistics;
-  ClockTimer timer(io_service);
+  boost::recursive_mutex count_mutex;
+  boost::recursive_mutex stat_mutex;
   TimerHandler wait_handler;
-  ClockTimePoint last_now;
+
+  int wait_usec = atoi(argv[1]);
+  int sample_size = atoi(argv[2]);
 
   if (wait_usec < 1) wait_usec = 50;
   if (sample_size < 1) sample_size = 10000;
 
-  wait_handler = [&](const boost::system::error_code& ec) {
-    statistics(static_cast<int>(
-        chrono::duration_cast<chrono::microseconds>(Clock::now() - last_now)
-            .count()));
-    ++count;
-    if (!ec && count < sample_size) {
-      last_now = Clock::now();
-      timer.expires_from_now(chrono::microseconds(wait_usec));
-      timer.async_wait(wait_handler);
-    } else {
-      wait_end.set_value(ec.value() == 0);
-    }
-  };
+  std::vector<TimerPtr> p_timers;
+  std::vector<ClockTimePoint> time_points(sample_size);
 
-  last_now = Clock::now();
-  timer.expires_from_now(chrono::microseconds(wait_usec));
-  timer.async_wait(wait_handler);
+  for (int i = 0; i < sample_size; ++i) {
+    p_timers.push_back(std::make_shared<ClockTimer>(io_service));
+  }
+
+  wait_handler =
+      [&](uint32_t timer_index, const boost::system::error_code& ec) {
+        ClockTimePoint now = Clock::now();
+
+        boost::recursive_mutex::scoped_lock lock(count_mutex);
+        ++timeout_count;
+
+        statistics(static_cast<int>(chrono::duration_cast<chrono::microseconds>(
+                                        now - time_points[timer_index])
+                                        .count()));
+        if (!wait_set && (ec || timeout_count == sample_size)) {
+          wait_set = true;
+          wait_end.set_value(ec.value() == 0);
+        }
+      };
 
   boost::thread_group threads;
   for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
     threads.create_thread([&io_service]() { io_service.run(); });
+  }
+
+  uint32_t i = 0;
+  for (auto& p_timer : p_timers) {
+    time_points[i] = Clock::now();
+    p_timer->expires_from_now(chrono::microseconds(wait_usec));
+    p_timer->async_wait(boost::bind(wait_handler, i, _1));
+    ++i;
   }
 
   if (!wait_end.get_future().get()) {
@@ -69,6 +93,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  p_worker.reset();
   threads.join_all();
 
   DisplayStatistics(statistics, wait_usec);
