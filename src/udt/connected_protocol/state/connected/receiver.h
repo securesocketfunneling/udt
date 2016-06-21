@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include <algorithm>
 #include <atomic>
 #include <map>
 #include <queue>
@@ -129,9 +130,18 @@ class Receiver {
       if (!packets_received_.empty()) {
         auto &begin_pair = *(packets_received_.begin());
         auto first_seq_num_received_buffer = begin_pair.first;
-        if (packet_seq_gen.SeqLength(first_seq_num_received_buffer,
-                                     packet_seq_num) >
-            static_cast<int32_t>(max_received_size_)) {
+        const auto required_received_size =
+            std::min(
+                // Be optimistic here.
+                // Find the smallest buffer size needed for
+                // 1. Sequence numbers are received in order. (2 arrives after 1)
+                // 2. Sequence numbers are received out of order. (1 arrives after 2)
+                // 3. Sequence number has restarted after reaching the maximum
+                packet_seq_gen.SeqLength(first_seq_num_received_buffer, packet_seq_num),
+                packet_seq_gen.SeqLength(packet_seq_num, first_seq_num_received_buffer)
+               );
+
+        if (required_received_size > static_cast<int32_t>(max_received_size_)) {
           // drop -> no more buffer space available
           return;
         }
