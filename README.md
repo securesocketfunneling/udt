@@ -19,7 +19,7 @@ The library provides UDT socket :
   * ip::udt<>::resolver
   * ip::udt<>::resolver::query
   
-[UDT protocol](/src/udt/ip/udt.h) can be customized with template parameters :
+[UDT protocol](/include/udt/ip/udt.h) can be customized with template parameters :
   * The first one is a Logger. By default there is no logging but it is possible
   to use a FileLogger which log internal variables for statistics. A [python 
   script](/tools/plot.py) is available to display logs as graphs.
