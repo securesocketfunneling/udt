@@ -6,7 +6,6 @@
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include <boost/asio/basic_socket.hpp>
-#include <boost/asio/detail/addressof.hpp>
 #include <boost/asio/detail/bind_handler.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/detail/fenced_block.hpp>
@@ -31,7 +30,7 @@ class basic_pending_connect_operation : public basic_pending_io_operation {
   * @param impl The implementation of the connected socket
   * @param p_endpoint The remote endpoint of the connected socket
   */
-  basic_pending_connect_operation(basic_pending_io_operation::func_type func)
+  explicit basic_pending_connect_operation(basic_pending_io_operation::func_type func)
       : basic_pending_io_operation(func) {}
 };
 
@@ -51,7 +50,7 @@ class pending_connect_operation
   * @param impl The socket implementation of the connected socket
   * @param handler The handler to call upon completion
   */
-  pending_connect_operation(Handler handler)
+  explicit pending_connect_operation(Handler handler)
       : basic_pending_connect_operation<Protocol>(
             &pending_connect_operation::do_complete),
         handler_(std::move(handler)) {}

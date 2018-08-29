@@ -9,7 +9,6 @@
 #include <set>
 
 #include <boost/asio/buffer.hpp>
-#include <boost/asio/detail/addressof.hpp>
 #include <boost/asio/detail/bind_handler.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/detail/fenced_block.hpp>

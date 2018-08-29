@@ -25,4 +25,6 @@ add_target(${project_NAME}
   PREFIX_SKIP
     ${project_SRC_DIR})
 
+target_compile_definitions(${project_NAME} PRIVATE -DBOOST_ASIO_ENABLE_OLD_SERVICES)
+
 target_link_libraries(${project_NAME} ${Boost_LIBRARIES} ${PLATFORM_SPECIFIC_LIB_DEP})

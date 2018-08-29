@@ -9,7 +9,7 @@
 
 #include <boost/log/trivial.hpp>
 #include <boost/thread.hpp>
-#include <boost/uuid/sha1.hpp>
+#include <boost/uuid/detail/sha1.hpp>
 
 #include "udt/common/error/error.h"
 
@@ -236,7 +236,7 @@ class AcceptorSession {
 
       previous_connected_sessions_[p_connected_pair->first] = p_socket_session;
       connected_sessions_.erase(p_connected_pair->first);
-      p_multiplexer_->get_io_service().post(std::move(do_complete));
+      p_multiplexer_->get_io_context().post(std::move(do_complete));
       return;
     }
   }
@@ -254,7 +254,7 @@ class AcceptorSession {
 
       auto do_complete = [op, ec]() { op->complete(ec); };
 
-      p_multiplexer_->get_io_service().post(std::move(do_complete));
+      p_multiplexer_->get_io_context().post(std::move(do_complete));
     }
   }
 

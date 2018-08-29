@@ -26,7 +26,7 @@ class basic_GenericHeader {
   ConstBuffers GetConstBuffers() const {
     ConstBuffers buffers;
     GetConstBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetConstBuffers(ConstBuffers *p_buffers) const {
@@ -36,7 +36,7 @@ class basic_GenericHeader {
   MutableBuffers GetMutableBuffers() {
     MutableBuffers buffers;
     GetMutableBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetMutableBuffers(MutableBuffers *p_buffers) {
@@ -107,7 +107,7 @@ class basic_DataHeader {
   ConstBuffers GetConstBuffers() const {
     ConstBuffers buffers;
     GetConstBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetConstBuffers(ConstBuffers *p_buffers) const {
@@ -117,7 +117,7 @@ class basic_DataHeader {
   MutableBuffers GetMutableBuffers() {
     MutableBuffers buffers;
     GetMutableBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetMutableBuffers(MutableBuffers *p_buffers) {
@@ -227,7 +227,7 @@ class basic_ControlHeader {
   ConstBuffers GetConstBuffers() const {
     ConstBuffers buffers;
     GetConstBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetConstBuffers(ConstBuffers *p_buffers) const {
@@ -237,7 +237,7 @@ class basic_ControlHeader {
   MutableBuffers GetMutableBuffers() {
     MutableBuffers buffers;
     GetMutableBuffers(&buffers);
-    return std::move(buffers);
+    return buffers;
   }
 
   void GetMutableBuffers(MutableBuffers *p_buffers) {

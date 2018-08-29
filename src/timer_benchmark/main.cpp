@@ -28,13 +28,13 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  boost::asio::io_service io_service;
+  boost::asio::io_context io_context;
   int count = 0;
   int wait_usec = atoi(argv[1]);
   int sample_size = atoi(argv[2]);
   std::promise<bool> wait_end;
   Accumulator statistics;
-  ClockTimer timer(io_service);
+  ClockTimer timer(io_context);
   TimerHandler wait_handler;
   ClockTimePoint last_now;
 
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 
   boost::thread_group threads;
   for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
-    threads.create_thread([&io_service]() { io_service.run(); });
+    threads.create_thread([&io_context]() { io_context.run(); });
   }
 
   if (!wait_end.get_future().get()) {

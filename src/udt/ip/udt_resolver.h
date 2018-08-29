@@ -1,7 +1,7 @@
 #ifndef UDT_IP_UDT_RESOLVER_H_
 #define UDT_IP_UDT_RESOLVER_H_
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/udp.hpp>
 
 #include "udt/connected_protocol/resolver.h"
@@ -16,8 +16,8 @@ class UDTResolver : public connected_protocol::Resolver<UDTProtocol> {
   using query = UDTQuery<UDTProtocol>;
 
  public:
-  UDTResolver(boost::asio::io_service& io_service)
-      : connected_protocol::Resolver<UDTProtocol>(io_service) {}
+  UDTResolver(boost::asio::io_context& io_context)
+      : connected_protocol::Resolver<UDTProtocol>(io_context) {}
 };
 
 }  // ip

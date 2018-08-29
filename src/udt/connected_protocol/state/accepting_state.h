@@ -64,7 +64,7 @@ class AcceptingState
 
     auto self = this->shared_from_this();
     // state session to closed state
-    p_session->ChangeState(ClosedState::Create(this->get_io_service()));
+    p_session->ChangeState(ClosedState::Create(this->get_io_context()));
 
     // stop timers
     boost::system::error_code timer_ec;
@@ -130,9 +130,9 @@ class AcceptingState
 
  private:
   AcceptingState(typename SocketSession::Ptr p_session)
-      : BaseState<Protocol>(p_session->get_io_service()),
+      : BaseState<Protocol>(p_session->get_io_context()),
         p_session_(p_session),
-        timeout_timer_(p_session->get_io_service()) {}
+        timeout_timer_(p_session->get_io_context()) {}
 
   void StartTimeoutTimer() {
     auto p_session = p_session_.lock();

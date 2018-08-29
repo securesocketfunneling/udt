@@ -102,7 +102,7 @@ class ConstBufferSequencePayload {
 
   void set_total_copy(std::size_t total_copy) { total_copy_ = total_copy; }
 
-  void complete(boost::asio::io_service& io_service) {
+  void complete(boost::asio::io_context& io_context) {
     if (p_sized_op_ != nullptr && total_copy_ != 0) {
       // Execute handler
       auto p_sized_op = p_sized_op_;
@@ -114,7 +114,7 @@ class ConstBufferSequencePayload {
                                       ::common::error::get_error_category()),
             total_copy);
       };
-      io_service.post(do_complete);
+      io_context.post(do_complete);
     }
   }
 

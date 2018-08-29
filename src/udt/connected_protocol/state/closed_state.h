@@ -14,8 +14,8 @@ class ClosedState : public BaseState<Protocol> {
   using Ptr = std::shared_ptr<ClosedState>;
 
  public:
-  static Ptr Create(boost::asio::io_service& io_service) {
-    return Ptr(new ClosedState(io_service));
+  static Ptr Create(boost::asio::io_context& io_context) {
+    return Ptr(new ClosedState(io_context));
   }
 
   virtual ~ClosedState() {}
@@ -23,8 +23,8 @@ class ClosedState : public BaseState<Protocol> {
   virtual typename BaseState<Protocol>::type GetType() { return this->CLOSED; }
 
  private:
-  ClosedState(boost::asio::io_service& io_service)
-      : BaseState<Protocol>(io_service) {}
+  ClosedState(boost::asio::io_context& io_context)
+      : BaseState<Protocol>(io_context) {}
 };
 
 }  // state

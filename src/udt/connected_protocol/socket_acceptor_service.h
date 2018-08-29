@@ -2,7 +2,7 @@
 #define UDT_CONNECTED_PROTOCOL_SOCKET_ACCEPTOR_SERVICE_H_
 
 #include <boost/asio/async_result.hpp>
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 
 #include <boost/thread/thread.hpp>
 #include <boost/system/error_code.hpp>
@@ -40,8 +40,8 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
   using native_type = native_handle_type;
 
  public:
-  explicit socket_acceptor_service(boost::asio::io_service& io_service)
-      : boost::asio::detail::service_base<socket_acceptor_service>(io_service) {
+  explicit socket_acceptor_service(boost::asio::io_context& io_context)
+      : boost::asio::detail::service_base<socket_acceptor_service>(io_context) {
   }
 
   virtual ~socket_acceptor_service() {}
@@ -153,7 +153,7 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
     }
 
     impl.p_multiplexer = protocol_type::multiplexers_manager_.GetMultiplexer(
-        this->get_io_service(), endpoint.next_layer_endpoint(), ec);
+        this->get_io_context(), endpoint.next_layer_endpoint(), ec);
     if (ec) {
       return ec;
     }
@@ -197,38 +197,38 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
                    BOOST_ASIO_MOVE_ARG(AcceptHandler) handler,
                    typename std::enable_if<boost::thread_detail::is_convertible<
                        protocol_type, Protocol1>::value>::type* = 0) {
-    boost::asio::detail::async_result_init<AcceptHandler,
+    boost::asio::async_completion<AcceptHandler,
                                            void(boost::system::error_code)>
-        init(BOOST_ASIO_MOVE_CAST(AcceptHandler)(handler));
+        init(handler);
 
     if (!is_open(impl)) {
-      this->get_io_service().post(
-          boost::asio::detail::binder1<decltype(init.handler),
+      this->get_io_context().post(
+          boost::asio::detail::binder1<AcceptHandler,
                                        boost::system::error_code>(
-              init.handler, boost::system::error_code(
+              handler, boost::system::error_code(
                                 ::common::error::broken_pipe,
                                 ::common::error::get_error_category())));
       return init.result.get();
     }
 
     if (!impl.p_multiplexer) {
-      this->get_io_service().post(
-          boost::asio::detail::binder1<decltype(init.handler),
+      this->get_io_context().post(
+          boost::asio::detail::binder1<AcceptHandler,
                                        boost::system::error_code>(
-              init.handler, boost::system::error_code(
+              handler, boost::system::error_code(
                                 ::common::error::bad_address,
                                 ::common::error::get_error_category())));
       return init.result.get();
     }
 
     using op =
-        io::pending_accept_operation<decltype(init.handler), protocol_type>;
+        io::pending_accept_operation<AcceptHandler, protocol_type>;
     typename op::ptr p = {
-        boost::asio::detail::addressof(init.handler),
-        boost_asio_handler_alloc_helpers::allocate(sizeof(op), init.handler),
+        boost::asio::detail::addressof(handler),
+        op::ptr::allocate(handler),
         0};
 
-    p.p = new (p.v) op(peer, nullptr, init.handler);
+    p.p = new (p.v) op(peer, nullptr, handler);
 
     impl.p_acceptor->PushAcceptOp(p.p);
 

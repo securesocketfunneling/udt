@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <boost/asio/buffer.hpp>
+#include <boost/asio/io_context.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -41,7 +42,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
   struct CompareSessionPacketSendingTime {
     bool operator()(std::weak_ptr<SocketSession> p_lhs,
-                    std::weak_ptr<SocketSession> p_rhs) {
+                    std::weak_ptr<SocketSession> p_rhs) const {
       auto p_shared_lhs = p_lhs.lock();
       auto p_shared_rhs = p_rhs.lock();
       if (!p_shared_lhs || !p_shared_rhs) {
@@ -60,8 +61,8 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
   using Ptr = std::shared_ptr<Flow>;
 
  public:
-  static Ptr Create(boost::asio::io_service& io_service) {
-    return Ptr(new Flow(io_service));
+  static Ptr Create(boost::asio::io_context& io_context) {
+    return Ptr(new Flow(io_context));
   }
 
   ~Flow() {}
@@ -86,11 +87,11 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
   void ResetLog() { sent_count_ = 0; }
 
  private:
-  Flow(boost::asio::io_service& io_service)
-      : io_service_(io_service),
+  Flow(boost::asio::io_context& io_context)
+      : io_context_(io_context),
         mutex_(),
         socket_sessions_(),
-        next_packet_timer_(io_service),
+        next_packet_timer_(io_context),
         pulling_(false),
         sent_count_(0) {}
 
@@ -120,7 +121,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
       auto p_next_socket_expired = (*p_next_socket_expired_it).lock();
       if (!p_next_socket_expired) {
-        io_service_.post(
+        io_context_.post(
             boost::bind(&Flow::PullSocketQueue, this->shared_from_this()));
         return;
       }
@@ -133,7 +134,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
         boost::system::error_code ec;
         ec.assign(::common::error::success,
                   ::common::error::get_error_category());
-        io_service_.post(boost::bind(&Flow::WaitPullSocketHandler,
+        io_context_.post(boost::bind(&Flow::WaitPullSocketHandler,
                                      this->shared_from_this(), ec));
         return;
       }
@@ -191,7 +192,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
       }
       auto self = this->shared_from_this();
       p_session->AsyncSendPacket(
-          p_datagram, [p_datagram](const boost::system::error_code& ec,
+          p_datagram, [](const boost::system::error_code& ec,
                                    std::size_t length) {});
     }
 
@@ -199,7 +200,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
   }
 
  private:
-  boost::asio::io_service& io_service_;
+  boost::asio::io_context& io_context_;
 
   boost::recursive_mutex mutex_;
   // sockets list

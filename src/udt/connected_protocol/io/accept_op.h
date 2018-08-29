@@ -6,7 +6,6 @@
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include <boost/asio/basic_socket.hpp>
-#include <boost/asio/detail/addressof.hpp>
 #include <boost/asio/detail/bind_handler.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/detail/fenced_block.hpp>

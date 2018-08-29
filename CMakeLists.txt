@@ -57,7 +57,7 @@ endif ()
 
 # --- Define boost version if not set
 if(NOT DEP_BOOST_VERSION)
-  set(DEP_BOOST_VERSION 1.58.0)
+  set(DEP_BOOST_VERSION 1.68.0)
 endif()
 
 # --- Setup Boost dependencies

@@ -33,7 +33,7 @@ class BaseState {
  public:
   virtual type GetType() = 0;
 
-  boost::asio::io_service& get_io_service() { return io_service_; }
+  boost::asio::io_context& get_io_context() { return io_context_; }
 
   virtual void Init() {}
 
@@ -52,7 +52,7 @@ class BaseState {
                                     ::common::error::get_error_category()),
           0);
     };
-    io_service_.post(do_complete);
+    io_context_.post(do_complete);
   }
 
   virtual void PushWriteOp(io::basic_pending_write_operation* write_op) {
@@ -63,7 +63,7 @@ class BaseState {
                                     ::common::error::get_error_category()),
           0);
     };
-    io_service_.post(do_complete);
+    io_context_.post(do_complete);
   }
 
   virtual bool HasPacketToSend() { return false; }
@@ -95,10 +95,10 @@ class BaseState {
   }
 
  protected:
-  BaseState(boost::asio::io_service& io_service) : io_service_(io_service) {}
+  BaseState(boost::asio::io_context& io_context) : io_context_(io_context) {}
 
  private:
-  boost::asio::io_service& io_service_;
+  boost::asio::io_context& io_context_;
 };
 
 }  // state

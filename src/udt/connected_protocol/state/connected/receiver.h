@@ -8,7 +8,7 @@
 #include <queue>
 #include <set>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/basic_waitable_timer.hpp>
 
 #include <boost/chrono.hpp>
@@ -182,7 +182,7 @@ class Receiver {
       packets_received_[packet_seq_num] = std::move(*p_datagram);
     }
 
-    p_session->get_io_service().post(boost::bind(
+    p_session->get_io_context().post(boost::bind(
         &Receiver::HandleQueues, this, boost::system::error_code(), p_state_));
   }
 
@@ -243,7 +243,7 @@ class Receiver {
       boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
       read_ops_queue_.push(read_op);
     }
-    p_session->get_io_service().post(boost::bind(
+    p_session->get_io_context().post(boost::bind(
         &Receiver::HandleQueues, this, boost::system::error_code(), p_state_));
   }
 
@@ -373,7 +373,7 @@ class Receiver {
     auto do_complete =
         [read_op, ec, copied]() { read_op->complete(ec, copied); };
 
-    p_session->get_io_service().post(std::move(do_complete));
+    p_session->get_io_context().post(std::move(do_complete));
   }
 
   void CloseReadOpsQueue() {
@@ -393,7 +393,7 @@ class Receiver {
                                      ::common::error::get_error_category());
         p_read_op->complete(ec, 0);
       };
-      p_session->get_io_service().dispatch(std::move(do_complete));
+      p_session->get_io_context().dispatch(std::move(do_complete));
     }
   }
 

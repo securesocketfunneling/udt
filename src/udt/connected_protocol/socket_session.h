@@ -8,7 +8,7 @@
 #include <memory>
 #include <set>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/socket_base.hpp>
 
 #include <boost/chrono.hpp>
@@ -288,8 +288,8 @@ class SocketSession
     }
   }
 
-  boost::asio::io_service& get_io_service() {
-    return p_multiplexer_->get_io_service();
+  boost::asio::io_context& get_io_context() {
+    return p_multiplexer_->get_io_context();
   }
 
  private:
@@ -299,7 +299,7 @@ class SocketSession
         p_flow_(std::move(p_fl)),
         acceptor_mutex_(),
         p_acceptor_(nullptr),
-        p_state_(ClosedState::Create(p_multiplexer_->get_io_service())),
+        p_state_(ClosedState::Create(p_multiplexer_->get_io_context())),
         socket_id_(0),
         remote_socket_id_(0),
         next_local_endpoint_(),
@@ -315,7 +315,7 @@ class SocketSession
         start_timestamp_(Clock::now()),
         connection_info_(),
         p_connection_info_cache_(),
-        logger_timer_(p_multiplexer_->get_io_service()),
+        logger_timer_(p_multiplexer_->get_io_context()),
         logger_() {}
 
   void Init() {

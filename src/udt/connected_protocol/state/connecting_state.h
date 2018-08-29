@@ -141,7 +141,7 @@ class ConnectingState
 
       p_session->ChangeState(ConnectedState::Create(p_session));
 
-      this->get_io_service().post(std::move(do_complete));
+      this->get_io_context().post(std::move(do_complete));
     }
   }
 
@@ -149,11 +149,11 @@ class ConnectingState
   ConnectingState(
       typename SocketSession::Ptr p_session,
       io::basic_pending_connect_operation<Protocol> *p_connection_op)
-      : BaseState<Protocol>(p_session->get_io_service()),
+      : BaseState<Protocol>(p_session->get_io_context()),
         p_session_(p_session),
         p_connection_op_(p_connection_op),
-        send_timer_(p_session->get_io_service()),
-        timeout_timer_(p_session->get_io_service()),
+        send_timer_(p_session->get_io_context()),
+        timeout_timer_(p_session->get_io_context()),
         stop_sending_(false) {}
 
   void Connect() {
@@ -266,7 +266,7 @@ class ConnectingState
           boost::system::error_code(::common::error::connection_aborted,
                                     ::common::error::get_error_category()));
     };
-    this->get_io_service().post(std::move(do_complete));
+    this->get_io_context().post(std::move(do_complete));
   }
 
  private:

@@ -88,7 +88,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  boost::asio::io_service &get_io_service() { return socket_.get_io_service(); }
+  boost::asio::io_context &get_io_context() { return socket_.get_io_context(); }
 
   NextEndpoint local_endpoint(boost::system::error_code &ec) {
     return socket_.local_endpoint(ec);
@@ -191,7 +191,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   void AsyncSendDataPacket(Datagram *p_datagram,
                            const NextEndpoint &next_endpoint, Handler handler) {
     if (p_datagram->is_acked()) {
-      this->get_io_service().post(
+      this->get_io_context().post(
           boost::asio::detail::binder2<decltype(handler),
                                        boost::system::error_code, std::size_t>(
               handler,
@@ -229,7 +229,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       : p_manager_(p_manager),
         socket_mutex_(),
         socket_(std::move(socket)),
-        p_worker_(new boost::asio::io_service::work(socket_.get_io_service())),
+        p_worker_(new boost::asio::io_context::work(socket_.get_io_context())),
         running_(false),
         flows_mutex_(),
         flows_(),
@@ -398,7 +398,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       return flow_it->second;
     }
 
-    FlowPtr p_flow(Flow<Protocol>::Create(get_io_service()));
+    FlowPtr p_flow(Flow<Protocol>::Create(get_io_context()));
     flows_[next_remote_endpoint] = p_flow;
 
     return p_flow;
@@ -418,7 +418,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   MultiplexerManager *p_manager_;
   boost::mutex socket_mutex_;
   NextSocket socket_;
-  std::unique_ptr<boost::asio::io_service::work> p_worker_;
+  std::unique_ptr<boost::asio::io_context::work> p_worker_;
   std::atomic<bool> running_;
   boost::recursive_mutex flows_mutex_;
   FlowsMap flows_;

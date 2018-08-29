@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -62,10 +62,10 @@ class Resolver {
   using iterator = EndpointIterator;
 
  public:
-  Resolver(boost::asio::io_service& io_service) : io_service_(io_service) {}
+  Resolver(boost::asio::io_context& io_context) : io_context_(io_context) {}
 
   iterator resolve(const query& q, boost::system::error_code& ec) {
-    typename NextLayer::resolver next_layer_resolver(io_service_);
+    typename NextLayer::resolver next_layer_resolver(io_context_);
     auto next_layer_iterator =
         next_layer_resolver.resolve(q.next_layer_query(), ec);
     if (ec) {
@@ -80,7 +80,7 @@ class Resolver {
   }
 
  private:
-  boost::asio::io_service& io_service_;
+  boost::asio::io_context& io_context_;
 };
 
 }  // connected_protocol

@@ -8,7 +8,7 @@
 #include <type_traits>
 
 #include <boost/asio/detail/op_queue.hpp>
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 
 #include <boost/bind.hpp>
 #include <boost/thread/recursive_mutex.hpp>
@@ -46,19 +46,19 @@ class basic_async_queue_service
     std::unique_ptr<boost::asio::detail::op_queue<
         io::basic_pending_get_operation<T>>> p_get_op_queue;
     uint32_t get_op_queue_size;
-    std::unique_ptr<boost::asio::io_service::work> p_get_work;
+    std::unique_ptr<boost::asio::io_context::work> p_get_work;
 
     mutable std::unique_ptr<boost::recursive_mutex> p_push_op_queue_mutex;
     std::unique_ptr<boost::asio::detail::op_queue<
         io::basic_pending_push_operation<T>>> p_push_op_queue;
     uint32_t push_op_queue_size;
-    std::unique_ptr<boost::asio::io_service::work> p_push_work;
+    std::unique_ptr<boost::asio::io_context::work> p_push_work;
   };
 
  public:
-  explicit basic_async_queue_service(boost::asio::io_service& io_service)
+  explicit basic_async_queue_service(boost::asio::io_context& io_context)
       : boost::asio::detail::service_base<basic_async_queue_service>(
-            io_service) {}
+            io_context) {}
 
   virtual ~basic_async_queue_service() {}
 
@@ -145,7 +145,7 @@ class basic_async_queue_service
 
     impl.container.push(std::move(element));
 
-    this->get_io_service().post(
+    this->get_io_context().post(
         boost::bind(&basic_async_queue_service::HandleGetQueues, this, &impl,
                     impl.p_valid));
 
@@ -156,26 +156,26 @@ class basic_async_queue_service
   template <class Handler>
   BOOST_ASIO_INITFN_RESULT_TYPE(Handler, void(boost::system::error_code))
       async_push(implementation_type& impl, T element, Handler&& handler) {
-    boost::asio::detail::async_result_init<Handler,
+    boost::asio::detail::async_result_helper<Handler,
                                            void(boost::system::error_code)>
-        init(std::forward<Handler>(handler));
+        helper(std::forward<Handler>(handler));
 
     if (!*impl.p_open) {
       io::PostHandler(
-          this->get_io_service(), init.handler,
+          this->get_io_context(), helper.handler,
           boost::system::error_code(::common::error::broken_pipe,
                                     ::common::error::get_error_category()));
 
-      return init.result.get();
+      return helper.result.get();
     }
 
     if (impl.push_op_queue_size >= OPQueueMaxSize) {
       io::PostHandler(
-          this->get_io_service(), init.handler,
+          this->get_io_context(), helper.handler,
           boost::system::error_code(::common::error::buffer_is_full_error,
                                     ::common::error::get_error_category()));
 
-      return init.result.get();
+      return helper.result.get();
     }
 
     typedef io::pending_push_operation<
@@ -183,10 +183,10 @@ class basic_async_queue_service
             Handler, void(boost::system::error_code)>::type,
         T> op;
     typename op::ptr p = {
-        boost::asio::detail::addressof(init.handler),
-        boost_asio_handler_alloc_helpers::allocate(sizeof(op), init.handler),
+        boost::asio::detail::addressof(helper.handler),
+        boost_asio_handler_alloc_helpers::allocate(sizeof(op), helper.handler),
         0};
-    p.p = new (p.v) op(init.handler, std::move(element));
+    p.p = new (p.v) op(helper.handler, std::move(element));
 
     {
       boost::recursive_mutex::scoped_lock lock(*impl.p_push_op_queue_mutex);
@@ -194,18 +194,18 @@ class basic_async_queue_service
       impl.p_push_op_queue->push(p.p);
       ++(impl.push_op_queue_size);
       if (!impl.p_push_work) {
-        impl.p_push_work = std::unique_ptr<boost::asio::io_service::work>(
-            new boost::asio::io_service::work(this->get_io_service()));
+        impl.p_push_work = std::unique_ptr<boost::asio::io_context::work>(
+            new boost::asio::io_context::work(this->get_io_context()));
       }
     }
 
     p.v = p.p = 0;
 
-    this->get_io_service().post(
+    this->get_io_context().post(
         boost::bind(&basic_async_queue_service::HandlePushQueues, this, &impl,
                     impl.p_valid));
 
-    return init.result.get();
+    return helper.result.get();
   }
 
   T get(implementation_type& impl, boost::system::error_code& ec) {
@@ -226,7 +226,7 @@ class basic_async_queue_service
     auto element = std::move(impl.container.front());
     impl.container.pop();
 
-    this->get_io_service().post(
+    this->get_io_context().post(
         boost::bind(&basic_async_queue_service::HandlePushQueues, this, &impl,
                     impl.p_valid));
 
@@ -237,13 +237,13 @@ class basic_async_queue_service
   template <class Handler>
   BOOST_ASIO_INITFN_RESULT_TYPE(Handler, void(boost::system::error_code, T))
       async_get(implementation_type& impl, Handler&& handler) {
-    boost::asio::detail::async_result_init<Handler,
+    boost::asio::async_completion<Handler,
                                            void(boost::system::error_code, T)>
-        init(std::forward<Handler>(handler));
+        init(handler);
 
     if (!*impl.p_open) {
       io::PostHandler(
-          this->get_io_service(), init.handler,
+          this->get_io_context(), handler,
           boost::system::error_code(::common::error::broken_pipe,
                                     ::common::error::get_error_category()),
           T());
@@ -253,7 +253,7 @@ class basic_async_queue_service
 
     if ((impl.get_op_queue_size) >= OPQueueMaxSize) {
       io::PostHandler(
-          this->get_io_service(), init.handler,
+          this->get_io_context(), handler,
           boost::system::error_code(::common::error::buffer_is_full_error,
                                     ::common::error::get_error_category()),
           T());
@@ -266,10 +266,10 @@ class basic_async_queue_service
             Handler, void(boost::system::error_code, T)>::type,
         T> op;
     typename op::ptr p = {
-        boost::asio::detail::addressof(init.handler),
-        boost_asio_handler_alloc_helpers::allocate(sizeof(op), init.handler),
+        boost::asio::detail::addressof(handler),
+        op::ptr::allocate(handler),
         0};
-    p.p = new (p.v) op(init.handler);
+    p.p = new (p.v) op(handler);
 
     {
       boost::recursive_mutex::scoped_lock lock(*impl.p_get_op_queue_mutex);
@@ -277,14 +277,14 @@ class basic_async_queue_service
       impl.p_get_op_queue->push(p.p);
       ++(impl.get_op_queue_size);
       if (!impl.p_get_work) {
-        impl.p_get_work = std::unique_ptr<boost::asio::io_service::work>(
-            new boost::asio::io_service::work(this->get_io_service()));
+        impl.p_get_work = std::unique_ptr<boost::asio::io_context::work>(
+            new boost::asio::io_context::work(this->get_io_context()));
       }
     }
 
     p.v = p.p = 0;
 
-    this->get_io_service().post(
+    this->get_io_context().post(
         boost::bind(&basic_async_queue_service::HandleGetQueues, this, &impl,
                     impl.p_valid));
 
@@ -379,7 +379,7 @@ class basic_async_queue_service
 
     auto do_complete =
         [op]() mutable { op->complete(boost::system::error_code()); };
-    this->get_io_service().post(do_complete);
+    this->get_io_context().post(do_complete);
 
     if (p_impl->p_push_op_queue->empty()) {
       p_impl->p_push_work.reset();
@@ -416,7 +416,7 @@ class basic_async_queue_service
     auto do_complete = [element, op]() mutable {
       op->complete(boost::system::error_code(), std::move(element));
     };
-    this->get_io_service().post(do_complete);
+    this->get_io_context().post(do_complete);
 
     if (p_impl->p_get_op_queue->empty()) {
       p_impl->p_get_work.reset();

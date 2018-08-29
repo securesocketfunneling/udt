@@ -8,7 +8,7 @@
 #include <set>
 #include <unordered_set>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/buffers_iterator.hpp>
 
 #include <boost/chrono.hpp>
@@ -51,7 +51,7 @@ class Sender {
         p_state_(nullptr),
         max_send_size_(8192),
         write_ops_mutex_(),
-        write_ops_queue_(p_session->get_io_service()),
+        write_ops_queue_(p_session->get_io_context()),
         unqueue_write_op_(false),
         loss_packets_mutex_(),
         loss_packets_(),
@@ -288,7 +288,7 @@ class Sender {
     write_ops_queue_.push(write_op, ec);
     if (ec) {
       auto do_complete = [write_op, ec]() { write_op->complete(ec, 0); };
-      p_session->get_io_service().post(do_complete);
+      p_session->get_io_context().post(do_complete);
     }
   }
 
@@ -336,7 +336,7 @@ class Sender {
                                      ::common::error::get_error_category());
         p_write_op->complete(ec, 0);
       };
-      p_session->get_io_service().dispatch(std::move(do_complete));
+      p_session->get_io_context().dispatch(std::move(do_complete));
     }
     write_ops_queue_.close(ec);
   }
@@ -378,7 +378,7 @@ class Sender {
                                     ::common::error::get_error_category()),
           total_copy);
     };
-    p_session->get_io_service().post(do_complete);
+    p_session->get_io_context().post(do_complete);
 
     p_session->AsyncSendPackets();
 

@@ -113,7 +113,7 @@ class ConnectedState : public BaseState<Protocol>,
 
     if (!closed_.load()) {
       closed_ = true;
-      p_session->ChangeState(ClosedState::Create(this->get_io_service()));
+      p_session->ChangeState(ClosedState::Create(this->get_io_context()));
     }
   }
 
@@ -226,16 +226,16 @@ class ConnectedState : public BaseState<Protocol>,
 
  private:
   ConnectedState(typename SocketSession::Ptr p_session)
-      : BaseState<Protocol>(p_session->get_io_service()),
+      : BaseState<Protocol>(p_session->get_io_context()),
         p_session_(p_session),
         sender_(p_session),
         receiver_(p_session),
         unqueue_write_op_(false),
         congestion_control_(p_session->get_p_connection_info()),
         stop_timers_(false),
-        ack_timer_(p_session->get_io_service()),
-        nack_timer_(p_session->get_io_service()),
-        exp_timer_(p_session->get_io_service()),
+        ack_timer_(p_session->get_io_context()),
+        nack_timer_(p_session->get_io_context()),
+        exp_timer_(p_session->get_io_context()),
         closed_(false),
         nack_count_(0),
         ack_count_(0),

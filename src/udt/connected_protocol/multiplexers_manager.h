@@ -25,13 +25,13 @@ class MultiplexerManager {
  public:
   MultiplexerManager() : mutex_(), multiplexers_() {}
   
-  MultiplexerPtr GetMultiplexer(boost::asio::io_service &io_service,
+  MultiplexerPtr GetMultiplexer(boost::asio::io_context &io_context,
                                    const NextLayerEndpoint &next_local_endpoint,
                                    boost::system::error_code &ec) {
     boost::mutex::scoped_lock lock(mutex_);
     auto multiplexer_it = multiplexers_.find(next_local_endpoint);
     if (multiplexer_it == multiplexers_.end()) {
-      NextSocket next_layer_socket(io_service);
+      NextSocket next_layer_socket(io_context);
       next_layer_socket.open(next_local_endpoint.protocol());
       // Empty endpoint will bind the socket to an available port
       next_layer_socket.bind(next_local_endpoint, ec);
