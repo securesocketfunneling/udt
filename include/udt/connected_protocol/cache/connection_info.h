@@ -188,7 +188,7 @@ class ConnectionInfo {
   TimePoint last_update_;
 };
 
-}  // congestion
-}  // connected_protocol
+}  // namespace cache
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_CACHE_CONNECTION_INFO_H_

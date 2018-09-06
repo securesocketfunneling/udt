@@ -5,12 +5,12 @@
 
 #include <string>
 
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/basic_stream_socket.hpp>
 #include <boost/asio/basic_socket_acceptor.hpp>
+#include <boost/asio/basic_stream_socket.hpp>
 #include <boost/asio/basic_waitable_timer.hpp>
 #include <boost/asio/detail/socket_option.hpp>
 #include <boost/asio/detail/socket_types.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/basic_resolver.hpp>
 
 #include <chrono>
@@ -28,11 +28,11 @@
 #include "multiplexer.h"
 #include "multiplexers_manager.h"
 
-#include "socket_session.h"
 #include "acceptor_session.h"
+#include "socket_session.h"
 
-#include "stream_socket_service.h"
 #include "socket_acceptor_service.h"
+#include "stream_socket_service.h"
 
 namespace connected_protocol {
 
@@ -86,9 +86,11 @@ class Protocol {
 
   using endpoint = Endpoint<Proto>;
 
-  using socket = boost::asio::basic_stream_socket<Proto, connected_protocol::stream_socket_service<Proto>>;
+  using socket = boost::asio::basic_stream_socket<
+      Proto, connected_protocol::stream_socket_service<Proto>>;
 
-  using acceptor = boost::asio::basic_socket_acceptor<Proto, connected_protocol::socket_acceptor_service<Proto>>;
+  using acceptor = boost::asio::basic_socket_acceptor<
+      Proto, connected_protocol::socket_acceptor_service<Proto>>;
 
   // Datagram types
   using EmptyPayload = datagram::EmptyComponent;
@@ -142,7 +144,8 @@ class Protocol {
 template <class Proto, class NextLayer, class Logger,
           template <class> class CongestionControlAlg>
 MultiplexerManager<Protocol<Proto, NextLayer, Logger, CongestionControlAlg>>
-    Protocol<Proto, NextLayer, Logger, CongestionControlAlg>::multiplexers_manager_;
-}  // connected_protocol
+    Protocol<Proto, NextLayer, Logger,
+             CongestionControlAlg>::multiplexers_manager_;
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_PROTOCOL_H_

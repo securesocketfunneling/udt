@@ -1,12 +1,12 @@
 #ifndef UDT_CONNECTED_PROTOCOL_MULTIPLEXERS_MANAGER_H_
 #define UDT_CONNECTED_PROTOCOL_MULTIPLEXERS_MANAGER_H_
 
+#include <iostream>
 #include <map>
 #include <memory>
-#include <iostream>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "multiplexer.h"
 
@@ -25,10 +25,10 @@ class MultiplexerManager {
   // TODO move multiplexers management in service
  public:
   MultiplexerManager() : mutex_(), multiplexers_() {}
-  
-  MultiplexerPtr GetMultiplexer(boost::asio::io_context &io_context,
-                                   const NextLayerEndpoint &next_local_endpoint,
-                                   boost::system::error_code &ec) {
+
+  MultiplexerPtr GetMultiplexer(boost::asio::io_context& io_context,
+                                const NextLayerEndpoint& next_local_endpoint,
+                                boost::system::error_code& ec) {
     boost::lock_guard<boost::mutex> lock(mutex_);
     auto multiplexer_it = multiplexers_.find(next_local_endpoint);
     if (multiplexer_it == multiplexers_.end()) {
@@ -55,7 +55,7 @@ class MultiplexerManager {
     return multiplexer_it->second;
   }
 
-  void CleanMultiplexer(const NextLayerEndpoint &next_local_endpoint) {
+  void CleanMultiplexer(const NextLayerEndpoint& next_local_endpoint) {
     boost::lock_guard<boost::mutex> lock(mutex_);
     if (multiplexers_.find(next_local_endpoint) != multiplexers_.end()) {
       boost::system::error_code ec;
@@ -70,6 +70,6 @@ class MultiplexerManager {
   MultiplexersMap multiplexers_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_MULTIPLEXERS_MANAGER_H_

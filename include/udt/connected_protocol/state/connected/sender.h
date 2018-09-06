@@ -3,21 +3,21 @@
 
 #include <cstdint>
 
+#include <chrono>
 #include <map>
 #include <queue>
 #include <set>
 #include <unordered_set>
-#include <chrono>
 
-#include <boost/asio/io_context.hpp>
 #include <boost/asio/buffers_iterator.hpp>
+#include <boost/asio/io_context.hpp>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "../../../common/error/error.h"
-#include "../../io/write_op.h"
 #include "../../../queue/async_queue.h"
+#include "../../io/write_op.h"
 
 namespace connected_protocol {
 namespace state {
@@ -27,7 +27,7 @@ template <class Protocol, class ConnectedState>
 class Sender {
  private:
   using WriteOpsQueue =
-      typename queue::basic_async_queue<io::basic_pending_write_operation *>;
+      typename queue::basic_async_queue<io::basic_pending_write_operation*>;
   using PacketSequenceNumber = uint32_t;
 
  private:
@@ -64,7 +64,7 @@ class Sender {
         packets_to_send_() {}
 
   void Init(typename ConnectedState::Ptr p_state,
-            CongestionControl *p_congestion_control) {
+            CongestionControl* p_congestion_control) {
     p_congestion_control_ = p_congestion_control;
     p_state_ = p_state;
     StartUnqueueWriteOp();
@@ -81,7 +81,7 @@ class Sender {
     return !nack_packets_.empty();
   }
 
-  void UpdateLossListFromNackDgr(const NAckDatagram &nack_dgr) {
+  void UpdateLossListFromNackDgr(const NAckDatagram& nack_dgr) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
@@ -101,7 +101,7 @@ class Sender {
               GetPacketSequenceValue(current_seq);
           ++i;
           if (i < loss_list_size && !IsInterval(nack_loss_list[i])) {
-            const auto &packet_seq_gen = p_session->packet_seq_gen();
+            const auto& packet_seq_gen = p_session->packet_seq_gen();
             PacketSequenceNumber second_range =
                 GetPacketSequenceValue(nack_loss_list[i]);
             PacketSequenceNumber j = first_range;
@@ -140,7 +140,7 @@ class Sender {
       auto nack_packet_it = nack_packets_.begin();
 
       while (nack_packet_it != nack_packets_.end()) {
-        const auto &seq_num = nack_packet_it->first;
+        const auto& seq_num = nack_packet_it->first;
         if (!nack_packet_it->second->is_acked()) {
           loss_packets_.insert(seq_num);
           ++nack_packet_it;
@@ -163,7 +163,8 @@ class Sender {
   }
 
   bool HasPacketToSend() {
-    boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
+    boost::lock_guard<boost::mutex> lock_packets_to_send(
+        packets_to_send_mutex_);
     boost::lock_guard<boost::mutex> lock(loss_packets_mutex_);
     return !packets_to_send_.empty() || !loss_packets_.empty();
   }
@@ -173,7 +174,7 @@ class Sender {
     return next_sending_packet_time_;
   }
 
-  SendDatagram *NextScheduledPacket() {
+  SendDatagram* NextScheduledPacket() {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return nullptr;
@@ -193,7 +194,7 @@ class Sender {
         // so check if it is in
         auto nack_packet_it = nack_packets_.find(packet_loss_number);
         if (nack_packet_it != nack_packets_.end()) {
-          SendDatagram *p_datagram = nack_packet_it->second.get();
+          SendDatagram* p_datagram = nack_packet_it->second.get();
           if (!p_datagram->is_acked()) {
             p_datagram->set_pending_send(true);
             UpdateNextSendingPacketTime(p_datagram, start_gen);
@@ -210,7 +211,8 @@ class Sender {
     SendDatagramPtr p_unique_datagram = nullptr;
     {
       boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
-      boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_to_send(
+          packets_to_send_mutex_);
 
       PacketSequenceNumber seq_num = p_session->packet_seq_gen().current();
       if (!packets_to_send_.empty()) {
@@ -226,10 +228,10 @@ class Sender {
         p_unique_datagram = std::move(packets_to_send_.front());
 
         // Update datagram metadata
-        p_unique_datagram->header().set_timestamp((uint32_t)(
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                Clock::now() - p_session->start_timestamp())
-                .count()));
+        p_unique_datagram->header().set_timestamp(
+            (uint32_t)(std::chrono::duration_cast<std::chrono::microseconds>(
+                           Clock::now() - p_session->start_timestamp())
+                           .count()));
         p_unique_datagram->header().set_packet_sequence_number(seq_num);
         p_unique_datagram->set_pending_send(true);
         p_congestion_control_->UpdateLastSendSeqNum(seq_num);
@@ -257,7 +259,7 @@ class Sender {
     }
 
     seq_number = GetPacketSequenceValue(seq_number);
-    const auto &packet_seq_gen = p_session->packet_seq_gen();
+    const auto& packet_seq_gen = p_session->packet_seq_gen();
 
     {
       boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
@@ -278,7 +280,7 @@ class Sender {
     }
   }
 
-  void PushWriteOp(io::basic_pending_write_operation *write_op) {
+  void PushWriteOp(io::basic_pending_write_operation* write_op) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
@@ -293,11 +295,11 @@ class Sender {
   }
 
  private:
-  void UpdateNextSendingPacketTime(SendDatagram *p_datagram,
-                                   const TimePoint &start_gen) {
+  void UpdateNextSendingPacketTime(SendDatagram* p_datagram,
+                                   const TimePoint& start_gen) {
     std::chrono::nanoseconds gen_time =
         std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() -
-                                                                 start_gen);
+                                                             start_gen);
     if (p_datagram->header().packet_sequence_number() % 16 == 0 ||
         !loss_packets_.empty()) {
       // every 16n packet, send a new one immediatly to evaluate link capacity
@@ -324,7 +326,7 @@ class Sender {
     }
 
     // Unqueue write ops queue and callback with error code
-    io::basic_pending_write_operation *p_write_op;
+    io::basic_pending_write_operation* p_write_op;
     boost::system::error_code ec;
     for (;;) {
       p_write_op = write_ops_queue_.get(ec);
@@ -356,8 +358,8 @@ class Sender {
         boost::bind(&Sender::ProcessWriteOp, this, _1, _2));
   }
 
-  void ProcessWriteOp(const boost::system::error_code &ec,
-                      io::basic_pending_write_operation *p_write_op) {
+  void ProcessWriteOp(const boost::system::error_code& ec,
+                      io::basic_pending_write_operation* p_write_op) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
@@ -387,7 +389,7 @@ class Sender {
 
   /// @return size of processed data
   std::size_t ProcessWriteOpBuffers(
-      const io::fixed_const_buffer_sequence &write_buffers) {
+      const io::fixed_const_buffer_sequence& write_buffers) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return 0;
@@ -404,15 +406,15 @@ class Sender {
     auto user_buf_end_it = boost::asio::buffers_end(write_buffers);
 
     // generate datagrams
-    SendDatagram *p_current_datagram = nullptr;
-    SendDatagram *p_previous_datagram = nullptr;
+    SendDatagram* p_current_datagram = nullptr;
+    SendDatagram* p_previous_datagram = nullptr;
     while ((user_buf_current_it != user_buf_end_it) && !add_error) {
       SendDatagramPtr p_unique_current_datagram =
           std::unique_ptr<SendDatagram>(new SendDatagram());
       copy_length = 0;
       p_current_datagram = p_unique_current_datagram.get();
-      auto &header = p_current_datagram->header();
-      auto &payload = p_current_datagram->payload();
+      auto& header = p_current_datagram->header();
+      auto& payload = p_current_datagram->payload();
       payload.SetSize(p_session->connection_info().packet_data_size() -
                       SendDatagram::Header::size);
       auto payload_buf = payload.GetMutableBuffers();
@@ -468,15 +470,16 @@ class Sender {
     return total_copy;
   }
 
-  boost::asio::const_buffer SubBuffer(const boost::asio::const_buffer &buffer,
+  boost::asio::const_buffer SubBuffer(const boost::asio::const_buffer& buffer,
                                       std::size_t end_offset) {
-    const uint8_t *buffer_data =
-        boost::asio::buffer_cast<const uint8_t *>(buffer);
+    const uint8_t* buffer_data =
+        boost::asio::buffer_cast<const uint8_t*>(buffer);
     return boost::asio::buffer(buffer_data, end_offset);
   }
 
   bool AddPacket(SendDatagramPtr p_unique_datagram) {
-    boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
+    boost::lock_guard<boost::mutex> lock_packets_to_send(
+        packets_to_send_mutex_);
     if (packets_to_send_.size() > max_send_size_) {
       return false;
     }
@@ -518,11 +521,11 @@ class Sender {
   boost::mutex packets_to_send_mutex_;
   std::queue<SendDatagramPtr> packets_to_send_;
 
-  CongestionControl *p_congestion_control_;
+  CongestionControl* p_congestion_control_;
 };
 
-}  // connected
-}  // state
-}  // connected_protocol
+}  // namespace connected
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_SENDER_H_

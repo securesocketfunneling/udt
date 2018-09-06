@@ -23,7 +23,7 @@ class EmptyComponent {
   void GetMutableBuffers(MutableBuffers* p_buffers) {}
 };
 
-}  // datagram
-}  // connected_protocol
+}  // namespace datagram
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_DATAGRAM_EMPTY_COMPONENT_H_

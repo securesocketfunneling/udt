@@ -15,9 +15,9 @@ TEST_CASE("UDTProtocol") {
   typename udt_protocol::endpoint ep;
 
   int family = protocol1.family();
-  (void) family;
+  (void)family;
   int type = protocol1.type();
-  (void) type;
+  (void)type;
   int protocol = protocol1.protocol();
-  (void) protocol;
+  (void)protocol;
 }

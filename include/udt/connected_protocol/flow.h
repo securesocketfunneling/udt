@@ -4,8 +4,8 @@
 #include <cstdint>
 
 #include <chrono>
-#include <set>
 #include <memory>
+#include <set>
 
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/io_context.hpp>
@@ -14,8 +14,8 @@
 
 #include <boost/system/error_code.hpp>
 
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 #include "logger/log_entry.h"
 
@@ -192,8 +192,8 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
       }
       auto self = this->shared_from_this();
       p_session->AsyncSendPacket(
-          p_datagram, [](const boost::system::error_code& ec,
-                                   std::size_t length) {});
+          p_datagram,
+          [](const boost::system::error_code& ec, std::size_t length) {});
     }
 
     PullSocketQueue();
@@ -211,6 +211,6 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
   std::atomic<uint32_t> sent_count_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_FLOW_H_

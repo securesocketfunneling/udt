@@ -26,19 +26,20 @@ class basic_pending_connect_operation : public basic_pending_io_operation {
  protected:
   /// Constructor
   /**
-  * @param func The completion handler
-  * @param impl The implementation of the connected socket
-  * @param p_endpoint The remote endpoint of the connected socket
-  */
-  explicit basic_pending_connect_operation(basic_pending_io_operation::func_type func)
+   * @param func The completion handler
+   * @param impl The implementation of the connected socket
+   * @param p_endpoint The remote endpoint of the connected socket
+   */
+  explicit basic_pending_connect_operation(
+      basic_pending_io_operation::func_type func)
       : basic_pending_io_operation(func) {}
 };
 
 /// Class to store connect operations on a fiber
 /**
-* @tparam Handler The type of the handler to be called upon completion
-* @tparam StreamSocket
-*/
+ * @tparam Handler The type of the handler to be called upon completion
+ * @tparam StreamSocket
+ */
 template <typename Handler, typename Protocol>
 class pending_connect_operation
     : public basic_pending_connect_operation<Protocol> {
@@ -47,9 +48,9 @@ class pending_connect_operation
 
   /// Constructor
   /**
-  * @param impl The socket implementation of the connected socket
-  * @param handler The handler to call upon completion
-  */
+   * @param impl The socket implementation of the connected socket
+   * @param handler The handler to call upon completion
+   */
   explicit pending_connect_operation(Handler handler)
       : basic_pending_connect_operation<Protocol>(
             &pending_connect_operation::do_complete),
@@ -57,10 +58,10 @@ class pending_connect_operation
 
   /// Implementation of the completion callback
   /**
-  * @param base A pointer to the base class
-  * @param destroy A boolean to decide if the op should be destroyed
-  * @param result_ec The error_code of the operation
-  */
+   * @param base A pointer to the base class
+   * @param destroy A boolean to decide if the op should be destroyed
+   * @param result_ec The error_code of the operation
+   */
   static void do_complete(basic_pending_io_operation* base, bool destroy,
                           const boost::system::error_code& result_ec) {
     boost::system::error_code ec(result_ec);
@@ -97,8 +98,8 @@ class pending_connect_operation
   Handler handler_;
 };
 
-}  // io
-}  // connected_protocol
+}  // namespace io
+}  // namespace connected_protocol
 
 #include <boost/asio/detail/pop_options.hpp>
 

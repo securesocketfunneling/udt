@@ -1,14 +1,14 @@
 #ifndef UDT_TESTS_TESTS_HELPERS_H_
 #define UDT_TESTS_TESTS_HELPERS_H_
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 #include <functional>
+#include <iostream>
 #include <list>
 #include <map>
 #include <string>
 #include <vector>
-#include <iostream>
 
 #include <boost/system/error_code.hpp>
 
@@ -55,10 +55,9 @@ struct helpers {
     std::size_t end(first_half ? buffer2.size() : buffer1.size());
     for (std::size_t i = begin; i < end; ++i) {
       if (buffer1[i] != buffer2[i - begin]) {
-        std::cerr
-            << "Check buffer failed at index " << i << " : "
-            << static_cast<uint8_t>(buffer1[i])
-            << " != " << static_cast<uint8_t>(buffer2[i - begin]) << "\n";
+        std::cerr << "Check buffer failed at index " << i << " : "
+                  << static_cast<uint8_t>(buffer1[i])
+                  << " != " << static_cast<uint8_t>(buffer2[i - begin]) << "\n";
         return false;
       }
     }
@@ -67,6 +66,6 @@ struct helpers {
   }
 };
 
-}  // tests
+}  // namespace tests
 
 #endif  // UDT_TESTS_TESTS_HELPERS_H_

@@ -13,12 +13,12 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/socket_base.hpp>
 
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 #include "io/connect_op.h"
-#include "io/write_op.h"
 #include "io/read_op.h"
+#include "io/write_op.h"
 
 #include "cache/connection_info.h"
 #include "cache/connections_info_manager.h"
@@ -375,8 +375,8 @@ class SocketSession
     p_control_header->set_additional_info(additional_info);
     p_control_header->set_destination_socket(remote_socket_id_);
     p_control_header->set_timestamp(static_cast<uint32_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            Clock::now() - start_timestamp_)
+        std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() -
+                                                              start_timestamp_)
             .count()));
   }
 
@@ -423,6 +423,6 @@ template <class Protocol>
 cache::ConnectionsInfoManager<Protocol>
     SocketSession<Protocol>::connections_info_manager_;
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_SOCKET_SESSION_H_

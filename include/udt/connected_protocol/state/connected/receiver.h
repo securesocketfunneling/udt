@@ -4,16 +4,16 @@
 #include <cstdint>
 
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <queue>
 #include <set>
-#include <chrono>
 
-#include <boost/asio/io_context.hpp>
 #include <boost/asio/basic_waitable_timer.hpp>
+#include <boost/asio/io_context.hpp>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "../../../common/error/error.h"
 #include "../../io/buffers.h"
@@ -33,7 +33,7 @@ class Receiver {
   using Timer = typename Protocol::timer;
   using TimePoint = typename Protocol::time_point;
   using ReadOpsQueue =
-      std::queue<io::basic_pending_stream_read_operation<Protocol> *>;
+      std::queue<io::basic_pending_stream_read_operation<Protocol>*>;
   using PacketSequenceNumber = uint32_t;
   using AckSequenceNumber = uint32_t;
   using SocketSession = typename Protocol::socket_session;
@@ -85,7 +85,7 @@ class Receiver {
     last_buffer_seq_ = initial_packet_seq_num - 1;
     last_ack_timestamp_ = Clock::now();
     last_ack2_timestamp_ = Clock::now();
-    const auto &connection_info = p_session->connection_info();
+    const auto& connection_info = p_session->connection_info();
 
     if (connection_info.packet_arrival_speed() > 0 &&
         connection_info.estimated_link_capacity() > 0) {
@@ -101,14 +101,14 @@ class Receiver {
     p_state_.reset();
   }
 
-  void OnDataDatagram(DataDatagram *p_datagram) {
+  void OnDataDatagram(DataDatagram* p_datagram) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
     }
 
-    const auto &packet_seq_gen = p_session->packet_seq_gen();
-    auto &header = p_datagram->header();
+    const auto& packet_seq_gen = p_session->packet_seq_gen();
+    auto& header = p_datagram->header();
     PacketSequenceNumber packet_seq_num = header.packet_sequence_number();
 
     // Save packet arrival time in receiver history window
@@ -125,9 +125,10 @@ class Receiver {
     }
 
     {
-      boost::lock_guard<boost::mutex> lock_packets_received(packets_received_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_received(
+          packets_received_mutex_);
       if (!packets_received_.empty()) {
-        auto &begin_pair = *(packets_received_.begin());
+        auto& begin_pair = *(packets_received_.begin());
         auto first_seq_num_received_buffer = begin_pair.first;
         if (packet_seq_gen.SeqLength(first_seq_num_received_buffer,
                                      packet_seq_num) >
@@ -166,7 +167,7 @@ class Receiver {
         p_session->AsyncSendControlPacket(
             *p_nack_dgr, NAckDatagram::Header::NACK,
             NAckDatagram::Header::NO_ADDITIONAL_INFO,
-            [p_session, p_nack_dgr](const boost::system::error_code &,
+            [p_session, p_nack_dgr](const boost::system::error_code&,
                                     std::size_t) {});
       } else if (packet_seq_gen.Compare(packet_seq_num, lrsn_.load()) < 0) {
         loss_list_.erase(packet_seq_num);
@@ -178,7 +179,8 @@ class Receiver {
     }
 
     {
-      boost::lock_guard<boost::mutex> lock_packets_received(packets_received_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_received(
+          packets_received_mutex_);
       packets_received_[packet_seq_num] = std::move(*p_datagram);
     }
 
@@ -195,8 +197,8 @@ class Receiver {
   }
 
   bool AckAck(AckSequenceNumber ack_seq_num,
-              PacketSequenceNumber *p_packet_seq_num,
-              std::chrono::microseconds *p_rtt) {
+              PacketSequenceNumber* p_packet_seq_num,
+              std::chrono::microseconds* p_rtt) {
     return ack_history_window_.Acknowledge(ack_seq_num, p_packet_seq_num,
                                            p_rtt);
   }
@@ -233,7 +235,7 @@ class Receiver {
                    .count() > 10;
   }
 
-  void PushReadOp(io::basic_pending_stream_read_operation<Protocol> *read_op) {
+  void PushReadOp(io::basic_pending_stream_read_operation<Protocol>* read_op) {
     auto p_session = p_session_.lock();
     if (!p_session) {
       return;
@@ -247,7 +249,7 @@ class Receiver {
         &Receiver::HandleQueues, this, boost::system::error_code(), p_state_));
   }
 
-  PacketSequenceNumber AckNumber(const SequenceGenerator &packet_seq_gen) {
+  PacketSequenceNumber AckNumber(const SequenceGenerator& packet_seq_gen) {
     boost::lock_guard<boost::mutex> lock(mutex_);
     if (loss_list_.empty()) {
       return packet_seq_gen.Inc(lrsn_.load());
@@ -300,14 +302,15 @@ class Receiver {
   }
 
  private:
-  void HandleQueues(const boost::system::error_code &ec,
+  void HandleQueues(const boost::system::error_code& ec,
                     typename ConnectedState::Ptr p_state) {
     auto p_session = p_session_.lock();
     if (!p_session || !p_state_) {
       return;
     }
 
-    boost::lock_guard<boost::mutex> packet_received_lock(packets_received_mutex_);
+    boost::lock_guard<boost::mutex> packet_received_lock(
+        packets_received_mutex_);
     boost::lock_guard<boost::mutex> read_ops_lock_(read_ops_mutex_);
 
     if (read_ops_queue_.empty() || packets_received_.empty()) {
@@ -319,7 +322,7 @@ class Receiver {
       return;
     }
 
-    const auto &packet_seq_gen = p_session->packet_seq_gen();
+    const auto& packet_seq_gen = p_session->packet_seq_gen();
 
     io::fixed_const_buffer_sequence packets_buffer;
 
@@ -344,7 +347,7 @@ class Receiver {
       current_packet_it = next_packet_it;
     }
 
-    io::basic_pending_stream_read_operation<Protocol> *read_op =
+    io::basic_pending_stream_read_operation<Protocol>* read_op =
         read_ops_queue_.front();
     read_ops_queue_.pop();
 
@@ -355,7 +358,7 @@ class Receiver {
 
     // clean packets_received set
     while (packet_it != packets_received_.end() && offset > 0) {
-      auto &payload = packet_it->second.payload();
+      auto& payload = packet_it->second.payload();
       buffer_size = payload.GetSize();
       if (offset >= buffer_size) {
         // packet consumed entirely
@@ -370,8 +373,9 @@ class Receiver {
       }
     }
 
-    auto do_complete =
-        [read_op, ec, copied]() { read_op->complete(ec, copied); };
+    auto do_complete = [read_op, ec, copied]() {
+      read_op->complete(ec, copied);
+    };
 
     p_session->get_io_context().post(std::move(do_complete));
   }
@@ -384,7 +388,7 @@ class Receiver {
 
     boost::lock_guard<boost::mutex> lock_read_ops(read_ops_mutex_);
     // Unqueue read ops queue and callback with error code
-    io::basic_pending_stream_read_operation<Protocol> *p_read_op;
+    io::basic_pending_stream_read_operation<Protocol>* p_read_op;
     while (!read_ops_queue_.empty()) {
       p_read_op = read_ops_queue_.front();
       read_ops_queue_.pop();
@@ -445,8 +449,8 @@ class Receiver {
   TimePoint last_ack_timestamp_;
 };
 
-}  // connected
-}  // state
-}  // connected_protocol
+}  // namespace connected
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_RECEIVER_H_

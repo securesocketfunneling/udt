@@ -1,8 +1,8 @@
 #ifndef UDT_COMMON_ERROR_ERROR_H_
 #define UDT_COMMON_ERROR_ERROR_H_
 
-#include <boost/system/error_code.hpp>
 #include <boost/asio/error.hpp>
+#include <boost/system/error_code.hpp>
 #include <string>
 
 namespace common {
@@ -68,14 +68,14 @@ class error_category : public boost::system::error_category {
   }
 };
 
-}  // detail
+}  // namespace detail
 
 inline const boost::system::error_category& get_error_category() {
   static detail::error_category instance;
   return instance;
 }
 
-}  // error
-}  // common
+}  // namespace error
+}  // namespace common
 
 #endif  // UDT_COMMON_ERROR_ERROR_H_

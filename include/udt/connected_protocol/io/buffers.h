@@ -21,8 +21,7 @@ class fixed_buffer_sequence {
   fixed_buffer_sequence() : buffers_() {}
 
   template <class BufferSequence>
-  fixed_buffer_sequence(const BufferSequence& buffers)
-      : buffers_() {
+  fixed_buffer_sequence(const BufferSequence& buffers) : buffers_() {
     for (const auto& buffer : buffers) {
       buffers_.push_back(buffer);
     }
@@ -47,7 +46,7 @@ using fixed_mutable_buffer_sequence =
 using fixed_const_buffer_sequence =
     fixed_buffer_sequence<boost::asio::const_buffer>;
 
-}  // io
-}  // connected_protocol
+}  // namespace io
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_IO_BUFFERS_H_

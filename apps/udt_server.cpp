@@ -2,8 +2,8 @@
 #include <thread>
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/asio/write.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -19,10 +19,10 @@ int main(int argc, char* argv[]) {
   using udt_protocol = ip::udt<>;
   using Buffer = std::array<uint8_t, 150000>;
   using SocketPtr = std::shared_ptr<udt_protocol::socket>;
-  using ReceiveHandler = std::function<void(const boost::system::error_code&, std::size_t,
-                             SocketPtr)>;
-  using AcceptHandler = std::function<void(const boost::system::error_code&, SocketPtr)>
-     ;
+  using ReceiveHandler = std::function<void(const boost::system::error_code&,
+                                            std::size_t, SocketPtr)>;
+  using AcceptHandler =
+      std::function<void(const boost::system::error_code&, SocketPtr)>;
 
   boost::asio::io_context io_context;
   boost::system::error_code resolve_ec;
@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
 
   accepted = [&](const boost::system::error_code& ec, SocketPtr p_socket) {
     if (ec) {
-      std::cout << "Error on accept : " << ec.value() << " "
-                               << ec.message() << "\n";
+      std::cout << "Error on accept : " << ec.value() << " " << ec.message()
+                << "\n";
       return;
     }
 
@@ -58,8 +58,7 @@ int main(int argc, char* argv[]) {
     boost::asio::async_read(*p_socket, boost::asio::buffer(r_buffer2),
                             boost::bind(received_handler, _1, _2, p_socket));
 
-    SocketPtr p_new_socket(
-        std::make_shared<udt_protocol::socket>(io_context));
+    SocketPtr p_new_socket(std::make_shared<udt_protocol::socket>(io_context));
     acceptor.async_accept(*p_new_socket,
                           boost::bind(accepted, _1, p_new_socket));
   };
@@ -67,8 +66,8 @@ int main(int argc, char* argv[]) {
   received_handler = [&](const boost::system::error_code& ec,
                          std::size_t length, SocketPtr p_socket) {
     if (ec) {
-      std::cerr << "Error on receive ec : " << ec.value() << " "
-                               << ec.message() << "\n";
+      std::cerr << "Error on receive ec : " << ec.value() << " " << ec.message()
+                << "\n";
       return;
     }
     std::cout << "Received : " << length << "\n";
@@ -86,9 +85,10 @@ int main(int argc, char* argv[]) {
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
-    threads.push_back(std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
+    threads.push_back(
+        std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
   }
-  for (auto &thread : threads) {
+  for (auto& thread : threads) {
     thread->join();
   }
 }

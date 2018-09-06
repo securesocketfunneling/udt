@@ -81,8 +81,8 @@ class pending_get_operation : public basic_pending_get_operation<T> {
   Handler handler_;
 };
 
-}  // io
-}  // queue
+}  // namespace io
+}  // namespace queue
 
 #include <boost/asio/detail/pop_options.hpp>
 

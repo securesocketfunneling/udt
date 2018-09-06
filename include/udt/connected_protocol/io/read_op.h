@@ -36,9 +36,9 @@ class basic_pending_read_operation : public basic_pending_sized_io_operation {
  protected:
   /// Constructor
   /**
-  * @param func The completion handler
-  * @param p_endpoint The remote endpoint
-  */
+   * @param func The completion handler
+   * @param p_endpoint The remote endpoint
+   */
   basic_pending_read_operation(basic_pending_sized_io_operation::func_type func,
                                fill_buffer_func_type fill_buffer_func,
                                endpoint_type* p_endpoint)
@@ -49,8 +49,8 @@ class basic_pending_read_operation : public basic_pending_sized_io_operation {
  public:
   /// Set the remote endpoint of the accepted socket
   /**
-  * @param e The remote endpoint to set
-  */
+   * @param e The remote endpoint to set
+   */
   void set_p_endpoint(endpoint_type e) {
     if (p_endpoint_) {
       *p_endpoint_ = std::move(e);
@@ -69,8 +69,8 @@ class basic_pending_read_operation : public basic_pending_sized_io_operation {
 
 /// Class to store read operations
 /**
-* @tparam Handler The type of the handler to be called upon completion
-*/
+ * @tparam Handler The type of the handler to be called upon completion
+ */
 template <class MutableBufferSequence, class Handler, class Protocol>
 class pending_read_operation : public basic_pending_read_operation<Protocol> {
  private:
@@ -82,9 +82,9 @@ class pending_read_operation : public basic_pending_read_operation<Protocol> {
 
   /// Constructor
   /**
-  * @param p_endpoint The remote endpoint
-  * @param handler The handler to call upon completion
-  */
+   * @param p_endpoint The remote endpoint
+   * @param handler The handler to call upon completion
+   */
   pending_read_operation(const MutableBufferSequence& buffers, Handler handler,
                          endpoint_type* p_endpoint)
       : basic_pending_read_operation<Protocol>(
@@ -95,10 +95,10 @@ class pending_read_operation : public basic_pending_read_operation<Protocol> {
 
   /// Implementation of the completion callback
   /**
-  * @param base A pointer to the base class
-  * @param destroy A boolean to decide if the op should be destroyed
-  * @param result_ec The error_code of the operation
-  */
+   * @param base A pointer to the base class
+   * @param destroy A boolean to decide if the op should be destroyed
+   * @param result_ec The error_code of the operation
+   */
   static void do_complete(basic_pending_sized_io_operation* base, bool destroy,
                           const boost::system::error_code& result_ec,
                           std::size_t length) {
@@ -118,7 +118,8 @@ class pending_read_operation : public basic_pending_read_operation<Protocol> {
     // to ensure that any owning sub-object remains valid until after we have
     // deallocated the memory here.
     boost::asio::detail::binder2<Handler, boost::system::error_code,
-                                 std::size_t> handler(o->handler_, ec, length);
+                                 std::size_t>
+        handler(o->handler_, ec, length);
     p.h = boost::asio::detail::addressof(handler.handler_);
     p.reset();
 
@@ -166,9 +167,9 @@ class basic_pending_stream_read_operation
  protected:
   /// Constructor
   /**
-  * @param func The completion handler
-  * @param p_endpoint The remote endpoint
-  */
+   * @param func The completion handler
+   * @param p_endpoint The remote endpoint
+   */
   basic_pending_stream_read_operation(
       basic_pending_sized_io_operation::func_type func,
       fill_buffer_func_type fill_buffer_func)
@@ -186,8 +187,8 @@ class basic_pending_stream_read_operation
 
 /// Class to store read operations
 /**
-* @tparam Handler The type of the handler to be called upon completion
-*/
+ * @tparam Handler The type of the handler to be called upon completion
+ */
 template <class MutableBufferSequence, class Handler, class Protocol>
 class pending_stream_read_operation
     : public basic_pending_stream_read_operation<Protocol> {
@@ -196,9 +197,9 @@ class pending_stream_read_operation
 
   /// Constructor
   /**
-  * @param p_endpoint The remote endpoint
-  * @param handler The handler to call upon completion
-  */
+   * @param p_endpoint The remote endpoint
+   * @param handler The handler to call upon completion
+   */
   pending_stream_read_operation(const MutableBufferSequence& buffers,
                                 Handler handler)
       : basic_pending_stream_read_operation<Protocol>(
@@ -209,10 +210,10 @@ class pending_stream_read_operation
 
   /// Implementation of the completion callback
   /**
-  * @param base A pointer to the base class
-  * @param destroy A boolean to decide if the op should be destroyed
-  * @param result_ec The error_code of the operation
-  */
+   * @param base A pointer to the base class
+   * @param destroy A boolean to decide if the op should be destroyed
+   * @param result_ec The error_code of the operation
+   */
   static void do_complete(basic_pending_sized_io_operation* base, bool destroy,
                           const boost::system::error_code& result_ec,
                           std::size_t length) {
@@ -233,7 +234,8 @@ class pending_stream_read_operation
     // to ensure that any owning sub-object remains valid until after we have
     // deallocated the memory here.
     boost::asio::detail::binder2<Handler, boost::system::error_code,
-                                 std::size_t> handler(o->handler_, ec, length);
+                                 std::size_t>
+        handler(o->handler_, ec, length);
     p.h = boost::asio::detail::addressof(handler.handler_);
     p.reset();
 
@@ -260,8 +262,8 @@ class pending_stream_read_operation
   Handler handler_;
 };
 
-}  // io
-}  // connected_protocol
+}  // namespace io
+}  // namespace connected_protocol
 
 #include <boost/asio/detail/pop_options.hpp>
 

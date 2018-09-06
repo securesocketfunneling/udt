@@ -27,7 +27,7 @@ class ClosedState : public BaseState<Protocol> {
       : BaseState<Protocol>(io_context) {}
 };
 
-}  // state
-}  // connected_protocol
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CLOSED_STATE_H_

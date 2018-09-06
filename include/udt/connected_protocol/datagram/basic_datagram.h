@@ -102,7 +102,7 @@ class basic_Datagram {
   std::atomic<bool> acked_;
 };
 
-}  // datagram
-}  // connected_protocol
+}  // namespace datagram
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_DATAGRAM_BASIC_DATAGRAM_H_

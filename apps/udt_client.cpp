@@ -2,8 +2,8 @@
 #include <thread>
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/asio/write.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -53,14 +53,15 @@ int main(int argc, char* argv[]) {
       boost::asio::async_write(socket, boost::asio::buffer(buffer1),
                                sent_handler);
     } else {
-      std::cout << "Error on connection : " << ec.value() << " "
-                               << ec.message()  << "\n";
+      std::cout << "Error on connection : " << ec.value() << " " << ec.message()
+                << "\n";
     }
   };
 
   sent_handler = [&](const boost::system::error_code& ec, std::size_t length) {
     if (ec) {
-      std::cout << "Error on sent : " << ec.value() << " " << ec.message() << "\n";
+      std::cout << "Error on sent : " << ec.value() << " " << ec.message()
+                << "\n";
       return;
     }
 
@@ -73,9 +74,10 @@ int main(int argc, char* argv[]) {
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
-    threads.push_back(std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
+    threads.push_back(
+        std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
   }
-  for (auto &thread : threads) {
+  for (auto& thread : threads) {
     thread->join();
   }
 }

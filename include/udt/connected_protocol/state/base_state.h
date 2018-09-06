@@ -7,8 +7,8 @@
 
 #include "../../common/error/error.h"
 
-#include "../io/write_op.h"
 #include "../io/read_op.h"
+#include "../io/write_op.h"
 #include "../logger/log_entry.h"
 
 namespace connected_protocol {
@@ -101,7 +101,7 @@ class BaseState {
   boost::asio::io_context& io_context_;
 };
 
-}  // state
-}  // connected_protocol
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_BASE_STATE_H_

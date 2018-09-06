@@ -57,7 +57,7 @@ class FileLog {
   std::ofstream file_;
 };
 
-}  // logger
-}  // connected_protocol
+}  // namespace logger
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_LOGGER_FILE_LOG_H_

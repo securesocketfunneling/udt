@@ -44,7 +44,7 @@ class ConnectingState
  public:
   static Ptr Create(
       typename SocketSession::Ptr p_socket_session,
-      io::basic_pending_connect_operation<Protocol> *p_connection_op) {
+      io::basic_pending_connect_operation<Protocol>* p_connection_op) {
     return Ptr(new ConnectingState(p_socket_session, p_connection_op));
   }
 
@@ -81,8 +81,8 @@ class ConnectingState
     }
 
     auto self = this->shared_from_this();
-    auto &header = p_connection_dgr->header();
-    auto &payload = p_connection_dgr->payload();
+    auto& header = p_connection_dgr->header();
+    auto& payload = p_connection_dgr->payload();
     uint32_t receive_cookie = payload.syn_cookie();
 
     if (payload.IsSynCookie()) {
@@ -106,7 +106,7 @@ class ConnectingState
       p_session->AsyncSendControlPacket(
           *p_connection_dgr, ConnectionDatagram::Header::CONNECTION,
           ConnectionDatagram::Header::NO_ADDITIONAL_INFO,
-          [self, p_connection_dgr](const boost::system::error_code &,
+          [self, p_connection_dgr](const boost::system::error_code&,
                                    std::size_t) {});
       return;
     }
@@ -148,7 +148,7 @@ class ConnectingState
  private:
   ConnectingState(
       typename SocketSession::Ptr p_session,
-      io::basic_pending_connect_operation<Protocol> *p_connection_op)
+      io::basic_pending_connect_operation<Protocol>* p_connection_op)
       : BaseState<Protocol>(p_session->get_io_context()),
         p_session_(p_session),
         p_connection_op_(p_connection_op),
@@ -165,7 +165,7 @@ class ConnectingState
     // Init connection datagram
     auto p_connection_dgr = std::make_shared<ConnectionDatagram>();
 
-    auto &payload = p_connection_dgr->payload();
+    auto& payload = p_connection_dgr->payload();
     payload.set_socket_type(ConnectionDatagram::Payload::STREAM);
     payload.set_initial_packet_sequence_number(
         p_session->packet_seq_gen().current());
@@ -187,7 +187,7 @@ class ConnectingState
 
   void SendLoopConnectionDgr(
       ConnectionDatagramPtr p_connection_dgr,
-      const boost::system::error_code &sent_ec = boost::system::error_code(),
+      const boost::system::error_code& sent_ec = boost::system::error_code(),
       std::size_t length = 0) {
     auto p_session = p_session_.lock();
     if (!p_session) {
@@ -206,7 +206,7 @@ class ConnectingState
     auto self = this->shared_from_this();
     send_timer_.expires_from_now(std::chrono::milliseconds(250));
     send_timer_.async_wait(
-        [p_connection_dgr, self, this](const boost::system::error_code &ec) {
+        [p_connection_dgr, self, this](const boost::system::error_code& ec) {
           auto p_session = this->p_session_.lock();
           if (!p_session) {
             return;
@@ -238,7 +238,7 @@ class ConnectingState
                                           this->shared_from_this(), _1));
   }
 
-  void HandleTimeoutTimer(const boost::system::error_code &ec) {
+  void HandleTimeoutTimer(const boost::system::error_code& ec) {
     if (!ec) {
       StopConnection();
     }
@@ -271,13 +271,13 @@ class ConnectingState
 
  private:
   std::weak_ptr<SocketSession> p_session_;
-  io::basic_pending_connect_operation<Protocol> *p_connection_op_;
+  io::basic_pending_connect_operation<Protocol>* p_connection_op_;
   Timer send_timer_;
   Timer timeout_timer_;
   bool stop_sending_;
 };
 
-}  // state
-}  // connected_protocol
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTING_STATE_H_

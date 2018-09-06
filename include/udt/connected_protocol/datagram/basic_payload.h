@@ -517,7 +517,7 @@ class basic_MessageDropRequestPayload {
  private:
   Content content_;
 };
-}  // datagram
-}  // connected_protocol
+}  // namespace datagram
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_DATAGRAM_BASIC_PAYLOAD_H_

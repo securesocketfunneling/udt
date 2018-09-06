@@ -1,0 +1,7 @@
+---
+# Defaults from the Google style.
+BasedOnStyle: Google
+DerivePointerAlignment: false
+---
+Language: Cpp
+Standard: Cpp11

@@ -30,7 +30,7 @@ struct LogEntry {
   long long rtt_var;
 };
 
-}  // logger
-}  // connected_protocol
+}  // namespace logger
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_LOGGER_LOG_ENTRY_H_

@@ -1,11 +1,11 @@
 #ifndef UDT_CONNECTED_PROTOCOL_CONGESTION_CONGESTION_CONTROL_H_
 #define UDT_CONNECTED_PROTOCOL_CONGESTION_CONGESTION_CONTROL_H_
 
-#include <memory>
 #include <chrono>
+#include <memory>
 
-#include "../sequence_generator.h"
 #include "../cache/connection_info.h"
+#include "../sequence_generator.h"
 
 namespace connected_protocol {
 namespace congestion {
@@ -25,7 +25,7 @@ class CongestionControl {
   using AckDatagram = typename Protocol::AckDatagram;
   using NAckDatagram = typename Protocol::NAckDatagram;
 
-  CongestionControl(ConnectionInfo *p_connection_info)
+  CongestionControl(ConnectionInfo* p_connection_info)
       : p_connection_info_(p_connection_info),
         window_flow_size_(16),
         max_window_size_(0),
@@ -49,10 +49,10 @@ class CongestionControl {
     last_update_ = Clock::now();
   }
 
-  void OnPacketSent(const SendDatagram &datagram) {}
+  void OnPacketSent(const SendDatagram& datagram) {}
 
-  void OnAck(const AckDatagram &ack_dgr,
-             const SequenceGenerator &packet_seq_gen) {
+  void OnAck(const AckDatagram& ack_dgr,
+             const SequenceGenerator& packet_seq_gen) {
     double syn_interval =
         static_cast<double>(p_connection_info_->syn_interval());
     double rtt = static_cast<double>(p_connection_info_->rtt().count());
@@ -67,7 +67,7 @@ class CongestionControl {
     TimePoint current_time = Clock::now();
 
     if (std::chrono::duration_cast<std::chrono::microseconds>(current_time -
-                                                                  last_update_)
+                                                              last_update_)
             .count() < p_connection_info_->syn_interval()) {
       return;
     }
@@ -126,8 +126,8 @@ class CongestionControl {
     p_connection_info_->set_sending_period(sending_period_.load());
   }
 
-  void OnLoss(const NAckDatagram &nack_dgr,
-              const connected_protocol::SequenceGenerator &seq_gen) {
+  void OnLoss(const NAckDatagram& nack_dgr,
+              const connected_protocol::SequenceGenerator& seq_gen) {
     std::vector<uint32_t> loss_list(nack_dgr.payload().GetLossPackets());
     PacketSequenceNumber first_loss_list_seq = GetSequenceNumber(loss_list[0]);
 
@@ -174,7 +174,7 @@ class CongestionControl {
     }
   }
 
-  void OnPacketReceived(const DataDatagram &datagram) {}
+  void OnPacketReceived(const DataDatagram& datagram) {}
 
   void OnTimeout() {}
 
@@ -211,7 +211,7 @@ class CongestionControl {
   }
 
  private:
-  ConnectionInfo *p_connection_info_;
+  ConnectionInfo* p_connection_info_;
   std::atomic<double> window_flow_size_;
   uint32_t max_window_size_;
   // in nanosec
@@ -230,7 +230,7 @@ class CongestionControl {
   TimePoint last_update_;
 };
 
-}  // congestion
-}  // connected_protocol
+}  // namespace congestion
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_CONGESTION_CONGESTION_CONTROL_H_

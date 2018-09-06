@@ -10,8 +10,8 @@
 #include "../common/error/error.h"
 
 #include "io/connect_op.h"
-#include "io/write_op.h"
 #include "io/read_op.h"
+#include "io/write_op.h"
 
 #include "state/connecting_state.h"
 
@@ -182,14 +182,13 @@ class stream_socket_service : public boost::asio::detail::service_base<
     return ec;
   }
 
-
   template <typename ConnectHandler>
   BOOST_ASIO_INITFN_RESULT_TYPE(ConnectHandler, void(boost::system::error_code))
-      async_connect(implementation_type& impl,
-                    const endpoint_type& peer_endpoint,
-                    BOOST_ASIO_MOVE_ARG(ConnectHandler) handler) {
-      boost::asio::async_completion<ConnectHandler,
-                                    void(boost::system::error_code)> init(handler);
+  async_connect(implementation_type& impl, const endpoint_type& peer_endpoint,
+                BOOST_ASIO_MOVE_ARG(ConnectHandler) handler) {
+    boost::asio::async_completion<ConnectHandler,
+                                  void(boost::system::error_code)>
+        init(handler);
 
     boost::system::error_code ec;
     if (!impl.p_multiplexer) {
@@ -200,8 +199,8 @@ class stream_socket_service : public boost::asio::detail::service_base<
       if (ec) {
         this->get_io_context().post(
             boost::asio::detail::binder1<ConnectHandler,
-                                         boost::system::error_code>(
-                handler, ec));
+                                         boost::system::error_code>(handler,
+                                                                    ec));
         return init.result.get();
       }
     }
@@ -209,16 +208,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
     impl.p_session = impl.p_multiplexer->CreateSocketSession(
         ec, peer_endpoint.next_layer_endpoint());
     if (ec) {
-      this->get_io_context().post(boost::asio::detail::binder1<
-          ConnectHandler, boost::system::error_code>(handler, ec));
+      this->get_io_context().post(
+          boost::asio::detail::binder1<ConnectHandler,
+                                       boost::system::error_code>(handler, ec));
       return init.result.get();
     }
 
-    typedef io::pending_connect_operation<ConnectHandler, protocol_type> connect_op_type;
-    typename connect_op_type::ptr p = {
-        boost::asio::detail::addressof(handler),
-        connect_op_type::ptr::allocate(handler),
-        0};
+    typedef io::pending_connect_operation<ConnectHandler, protocol_type>
+        connect_op_type;
+    typename connect_op_type::ptr p = {boost::asio::detail::addressof(handler),
+                                       connect_op_type::ptr::allocate(handler),
+                                       0};
 
     p.p = new (p.v) connect_op_type(handler);
     impl.p_session->ChangeState(ConnectingState::Create(impl.p_session, p.p));
@@ -232,16 +232,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
   boost::system::error_code set_option(implementation_type& impl,
                                        const SettableSocketOption& option,
                                        boost::system::error_code& ec) {
-// NOTE: Don't understand this code.
-//    if (!impl.p_session) {
-//      impl.timeout = option.value();
-//      ec.assign(::common::error::success,
-//                ::common::error::get_error_category());
-//      return ec;
-//    }
+    // NOTE: Don't understand this code.
+    //    if (!impl.p_session) {
+    //      impl.timeout = option.value();
+    //      ec.assign(::common::error::success,
+    //                ::common::error::get_error_category());
+    //      return ec;
+    //    }
 
     if (option.name(protocol_type::v4()) == protocol_type::TIMEOUT_DELAY) {
-      impl.p_session->set_timeout_delay((uint32_t)(*option.data(protocol_type::v4())));
+      impl.p_session->set_timeout_delay(
+          (uint32_t)(*option.data(protocol_type::v4())));
     } else {
       ec.assign(::common::error::function_not_supported,
                 ::common::error::get_error_category());
@@ -280,17 +281,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
   template <typename ConstBufferSequence, typename WriteHandler>
   BOOST_ASIO_INITFN_RESULT_TYPE(WriteHandler,
                                 void(boost::system::error_code, std::size_t))
-      async_send(implementation_type& impl, const ConstBufferSequence& buffers,
-                 boost::asio::socket_base::message_flags flags,
-                 BOOST_ASIO_MOVE_ARG(WriteHandler) handler) {
-    boost::asio::async_completion<
-        WriteHandler, void(boost::system::error_code, std::size_t)>
+  async_send(implementation_type& impl, const ConstBufferSequence& buffers,
+             boost::asio::socket_base::message_flags flags,
+             BOOST_ASIO_MOVE_ARG(WriteHandler) handler) {
+    boost::asio::async_completion<WriteHandler,
+                                  void(boost::system::error_code, std::size_t)>
         init(handler);
 
     if (!impl.p_session) {
       this->get_io_context().post(
-          boost::asio::detail::binder2<WriteHandler,
-                                       boost::system::error_code, std::size_t>(
+          boost::asio::detail::binder2<WriteHandler, boost::system::error_code,
+                                       std::size_t>(
               handler,
               boost::system::error_code(::common::error::not_connected,
                                         ::common::error::get_error_category()),
@@ -300,8 +301,8 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
     if (boost::asio::buffer_size(buffers) == 0) {
       this->get_io_context().post(
-          boost::asio::detail::binder2<WriteHandler,
-                                       boost::system::error_code, std::size_t>(
+          boost::asio::detail::binder2<WriteHandler, boost::system::error_code,
+                                       std::size_t>(
               handler,
               boost::system::error_code(::common::error::success,
                                         ::common::error::get_error_category()),
@@ -309,11 +310,10 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    using write_op_type = io::pending_write_operation<ConstBufferSequence, WriteHandler>;
-    typename write_op_type::ptr p = {
-        boost::asio::detail::addressof(handler),
-        write_op_type::ptr::allocate(handler),
-        0};
+    using write_op_type =
+        io::pending_write_operation<ConstBufferSequence, WriteHandler>;
+    typename write_op_type::ptr p = {boost::asio::detail::addressof(handler),
+                                     write_op_type::ptr::allocate(handler), 0};
 
     p.p = new (p.v) write_op_type(buffers, handler);
 
@@ -343,18 +343,17 @@ class stream_socket_service : public boost::asio::detail::service_base<
   template <typename MutableBufferSequence, typename ReadHandler>
   BOOST_ASIO_INITFN_RESULT_TYPE(ReadHandler,
                                 void(boost::system::error_code, std::size_t))
-      async_receive(implementation_type& impl,
-                    const MutableBufferSequence& buffers,
-                    boost::asio::socket_base::message_flags flags,
-                    BOOST_ASIO_MOVE_ARG(ReadHandler) handler) {
-    boost::asio::async_completion<
-        ReadHandler, void(boost::system::error_code, std::size_t)>
+  async_receive(implementation_type& impl, const MutableBufferSequence& buffers,
+                boost::asio::socket_base::message_flags flags,
+                BOOST_ASIO_MOVE_ARG(ReadHandler) handler) {
+    boost::asio::async_completion<ReadHandler,
+                                  void(boost::system::error_code, std::size_t)>
         init(handler);
 
     if (!impl.p_session) {
       this->get_io_context().post(
-          boost::asio::detail::binder2<ReadHandler,
-                                       boost::system::error_code, std::size_t>(
+          boost::asio::detail::binder2<ReadHandler, boost::system::error_code,
+                                       std::size_t>(
               handler,
               boost::system::error_code(::common::error::not_connected,
                                         ::common::error::get_error_category()),
@@ -364,8 +363,8 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
     if (boost::asio::buffer_size(buffers) == 0) {
       this->get_io_context().post(
-          boost::asio::detail::binder2<ReadHandler,
-                                       boost::system::error_code, std::size_t>(
+          boost::asio::detail::binder2<ReadHandler, boost::system::error_code,
+                                       std::size_t>(
               handler,
               boost::system::error_code(::common::error::success,
                                         ::common::error::get_error_category()),
@@ -373,12 +372,11 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    using read_op_type = io::pending_stream_read_operation<
-        MutableBufferSequence, ReadHandler, protocol_type>;
-    typename read_op_type::ptr p = {
-        boost::asio::detail::addressof(handler),
-        read_op_type::ptr::allocate(handler),
-        0};
+    using read_op_type =
+        io::pending_stream_read_operation<MutableBufferSequence, ReadHandler,
+                                          protocol_type>;
+    typename read_op_type::ptr p = {boost::asio::detail::addressof(handler),
+                                    read_op_type::ptr::allocate(handler), 0};
 
     p.p = new (p.v) read_op_type(buffers, handler);
 
@@ -402,6 +400,6 @@ class stream_socket_service : public boost::asio::detail::service_base<
 
 #include <boost/asio/detail/pop_options.hpp>
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STREAM_SOCKET_SERVICE_H_

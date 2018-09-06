@@ -7,8 +7,8 @@
 #include <map>
 #include <string>
 
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 #include "connection_info.h"
 
@@ -33,8 +33,10 @@ class ConnectionsInfoManager {
         connections_mutex_(),
         connections_info_() {}
 
-  std::weak_ptr<ConnectionInfo> GetConnectionInfo(const NextEndpoint& next_endpoint) {
-    boost::lock_guard<boost::recursive_mutex> lock_connections(connections_mutex_);
+  std::weak_ptr<ConnectionInfo> GetConnectionInfo(
+      const NextEndpoint& next_endpoint) {
+    boost::lock_guard<boost::recursive_mutex> lock_connections(
+        connections_mutex_);
     std::string address(next_endpoint.address().to_string());
     ConnectionsInfoMap::iterator connection_info_it(
         connections_info_.find(address));
@@ -54,7 +56,8 @@ class ConnectionsInfoManager {
 
  private:
   void FreeItem() {
-    boost::lock_guard<boost::recursive_mutex> lock_connections(connections_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_connections(
+        connections_mutex_);
     ConnectionsInfoMap::iterator oldest_pair_it(connections_info_.begin());
     ConnectionsInfoMap::iterator current_pair_it(oldest_pair_it);
     ConnectionsInfoMap::iterator end_pair_it(connections_info_.end());
@@ -74,7 +77,7 @@ class ConnectionsInfoManager {
   ConnectionsInfoMap connections_info_;
 };
 
-}  // congestion
-}  // connected_protocol
+}  // namespace cache
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_CACHE_CONNECTIONS_INFO_MANAGER_H_

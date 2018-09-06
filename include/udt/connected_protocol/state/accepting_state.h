@@ -10,8 +10,8 @@
 #include <boost/system/error_code.hpp>
 
 #include "base_state.h"
-#include "connected_state.h"
 #include "closed_state.h"
+#include "connected_state.h"
 
 #include "policy/response_connection_policy.h"
 
@@ -159,7 +159,7 @@ class AcceptingState
   Timer timeout_timer_;
 };
 
-}  // state
-}  // connected_protocol
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_ACCEPTING_STATE_H_

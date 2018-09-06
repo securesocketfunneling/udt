@@ -20,7 +20,7 @@ class NoLog {
   void Log(const LogEntry& log) {}
 };
 
-}  // logger
-}  // connected_protocol
+}  // namespace logger
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_LOGGER_NO_LOG_H_

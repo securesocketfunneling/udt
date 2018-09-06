@@ -1,21 +1,21 @@
 #ifndef UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_STATE_H_
 #define UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_STATE_H_
 
-#include <cstdint>
-#include <memory>
 #include <chrono>
+#include <cstdint>
 #include <iostream>
+#include <memory>
 
 #include <boost/bind.hpp>
 
+#include "../io/buffers.h"
 #include "../io/read_op.h"
 #include "../io/write_op.h"
-#include "../io/buffers.h"
 
 #include "base_state.h"
 
-#include "connected/sender.h"
 #include "connected/receiver.h"
+#include "connected/sender.h"
 
 namespace connected_protocol {
 namespace state {
@@ -608,7 +608,9 @@ class ConnectedState : public BaseState<Protocol>,
     auto self = this->shared_from_this();
     ShutdownDatagramPtr p_shutdown_dgr = std::make_shared<ShutdownDatagram>();
     auto shutdown_handler = [self, p_session, p_shutdown_dgr](
-        const boost::system::error_code&, std::size_t) { p_session->Unbind(); };
+                                const boost::system::error_code&, std::size_t) {
+      p_session->Unbind();
+    };
 
     p_session->UpdateCacheConnection();
 
@@ -642,7 +644,7 @@ class ConnectedState : public BaseState<Protocol>,
   std::atomic<uint32_t> packet_received_since_light_ack_;
 };
 
-}  // state
-}  // connected_protocol
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_STATE_H_

@@ -2,14 +2,14 @@
 
 #include "udt/ip/udt.h"
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 #include <list>
 #include <map>
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/use_future.hpp>
 #include <boost/asio/spawn.hpp>
+#include <boost/asio/use_future.hpp>
 
 #include <boost/asio/socket_base.hpp>
 
@@ -111,10 +111,11 @@ void TestMultipleConnections(
     connected_sockets[i].async_connect(remote_endpoint, connected);
   }
 
-    std::vector<std::shared_ptr<std::thread>> threads;
-    for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
-        threads.push_back(std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
-    }
+  std::vector<std::shared_ptr<std::thread>> threads;
+  for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
+    threads.push_back(
+        std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
+  }
 
   REQUIRE(connected_ok.get_future().get() == true);
 
@@ -145,7 +146,7 @@ void TestMultipleConnections(
     REQUIRE(0 == close_ec.value());
   }
 
-  for (auto &thread : threads) {
+  for (auto& thread : threads) {
     thread->join();
   }
 }
@@ -255,7 +256,8 @@ void TestStreamProtocol(
     }
 
     {
-      boost::lock_guard<boost::mutex> lock_first_received1(first_received_mutex1);
+      boost::lock_guard<boost::mutex> lock_first_received1(
+          first_received_mutex1);
       if (first_received_socket_1) {
         REQUIRE(tests::helpers::CheckHalfBuffers(buffer2, r_buffer1, true));
         tests::helpers::ResetBuffer(&r_buffer1, 0);
@@ -297,7 +299,8 @@ void TestStreamProtocol(
     REQUIRE(0 == ec.value());
 
     {
-      boost::lock_guard<boost::mutex> lock_first_received2(first_received_mutex2);
+      boost::lock_guard<boost::mutex> lock_first_received2(
+          first_received_mutex2);
       if (first_received_socket_2) {
         REQUIRE(tests::helpers::CheckHalfBuffers(buffer1, r_buffer2, true));
         tests::helpers::ResetBuffer(&r_buffer1, 0);
@@ -353,9 +356,10 @@ void TestStreamProtocol(
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
-    threads.push_back(std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
+    threads.push_back(
+        std::make_shared<std::thread>([&io_context]() { io_context.run(); }));
   }
-  for (auto &thread : threads) {
+  for (auto& thread : threads) {
     thread->join();
   }
 }
@@ -640,9 +644,7 @@ void TestStreamErrorConnectionProtocol(
       *remote_no_connect_endpoint_it);
 
   tests::helpers::ConnectHandler connection_error_handler =
-      [](const boost::system::error_code& ec) {
-        REQUIRE(0 != ec.value());
-      };
+      [](const boost::system::error_code& ec) { REQUIRE(0 != ec.value()); };
 
   socket_client_no_connection.async_connect(remote_no_connect_endpoint,
                                             connection_error_handler);
@@ -657,21 +659,27 @@ void TestStreamErrorConnectionProtocol(
 using udt_protocol = ip::udt<>;
 
 TEST_CASE("UDTTestMultipleConnections") {
-    udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(), "9000");
-    udt_protocol::resolver::query client_local_udt_query("127.0.0.1", "8000");
-    udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
+  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
+                                                   "9000");
+  udt_protocol::resolver::query client_local_udt_query("127.0.0.1", "8000");
+  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
 
-    // TODO: fix compilation
-    //TestMultipleConnections<udt_protocol>(client_local_udt_query, client_udt_query, acceptor_udt_query, 200, 100);
+  // TODO: fix compilation
+  // TestMultipleConnections<udt_protocol>(client_local_udt_query,
+  // client_udt_query, acceptor_udt_query, 200, 100);
 }
 
 TEST_CASE("UDTProtocolLightExchangeTest") {
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(), "9000");
+  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
+                                                   "9000");
   udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
 
-    // TODO: fix compilation
-//  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 1);
-//  TestStreamProtocolFuture<udt_protocol>(client_udt_query, acceptor_udt_query);
-//  TestStreamProtocolSpawn<udt_protocol>(client_udt_query, acceptor_udt_query);
-//  TestStreamProtocolSynchronous<udt_protocol>(client_udt_query, acceptor_udt_query);
+  // TODO: fix compilation
+  //  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 1);
+  //  TestStreamProtocolFuture<udt_protocol>(client_udt_query,
+  //  acceptor_udt_query);
+  //  TestStreamProtocolSpawn<udt_protocol>(client_udt_query,
+  //  acceptor_udt_query);
+  //  TestStreamProtocolSynchronous<udt_protocol>(client_udt_query,
+  //  acceptor_udt_query);
 }

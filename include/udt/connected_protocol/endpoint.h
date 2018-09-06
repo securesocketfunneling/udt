@@ -50,11 +50,11 @@ class Endpoint {
   }
 
   protocol_type protocol() const {
-      if (next_layer_endpoint_.protocol() == NextLayer::v4()) {
-          return protocol_type::v4();
-      } else {
-          return protocol_type::v6();
-      }
+    if (next_layer_endpoint_.protocol() == NextLayer::v4()) {
+      return protocol_type::v4();
+    } else {
+      return protocol_type::v6();
+    }
   }
 
   SocketId socket_id() const { return socket_id_; }
@@ -100,6 +100,6 @@ class Endpoint {
   NextLayerEndpoint next_layer_endpoint_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_ENDPOINT_H_

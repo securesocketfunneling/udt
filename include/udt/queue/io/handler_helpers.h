@@ -16,7 +16,7 @@ void PostHandler(Poster& poster, Handler&& handler, Args&&... args) {
                                                 std::forward<Args>(args)...));
 }
 
-}  // io
-}  // queue
+}  // namespace io
+}  // namespace queue
 
 #endif  // UDT_QUEUE_IO_HANDLER_HELPERS_H_

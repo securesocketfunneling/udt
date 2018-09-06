@@ -40,8 +40,8 @@ class ResponseConnectionPolicy {
   }
 };
 
-}  // policy
-}  // state
-}  // connected_protocol
+}  // namespace policy
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_POLICY_RESPONSE_CONNECTION_POLICY_H_

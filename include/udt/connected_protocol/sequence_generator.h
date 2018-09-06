@@ -6,8 +6,8 @@
 
 #include <chrono>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -106,6 +106,6 @@ class SequenceGenerator {
   SeqNumber threshold_compare_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_SEQUENCE_GENERATOR_H_

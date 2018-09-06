@@ -4,16 +4,16 @@
 #include <cstdint>
 
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <numeric>
 #include <queue>
-#include <chrono>
 
-#include <boost/asio/io_context.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
+#include <boost/asio/io_context.hpp>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 namespace connected_protocol {
 namespace state {
@@ -108,8 +108,8 @@ class AckHistoryWindow {
   std::vector<TimePoint> ack_timestamps_;
 };
 
-}  // connected
-}  // state
-}  // connected_protocol
+}  // namespace connected
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_ACK_HISTORY_WINDOW_H_

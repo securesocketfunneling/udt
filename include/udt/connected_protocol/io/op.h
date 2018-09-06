@@ -17,8 +17,8 @@ class basic_pending_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
  public:
   /// Function called on completion
   /**
-  * @param ec The error code resulting of the completed operation
-  */
+   * @param ec The error code resulting of the completed operation
+   */
   void complete(const boost::system::error_code& ec) {
     auto destroy = false;
     func_(this, destroy, ec);
@@ -30,10 +30,11 @@ class basic_pending_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   }
 
  protected:
-  using func_type = void(*)(basic_pending_io_operation*, bool,
-                            const boost::system::error_code& ec);
+  using func_type = void (*)(basic_pending_io_operation*, bool,
+                             const boost::system::error_code& ec);
 
-  explicit basic_pending_io_operation(func_type func) : next_(nullptr), func_(func) {}
+  explicit basic_pending_io_operation(func_type func)
+      : next_(nullptr), func_(func) {}
 
   ~basic_pending_io_operation() = default;
 
@@ -47,9 +48,9 @@ class basic_pending_sized_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
  public:
   /// Function called on completion
   /**
-  * @param ec The error code resulting of the completed operation
-  * @param length The length of the result
-  */
+   * @param ec The error code resulting of the completed operation
+   * @param length The length of the result
+   */
   void complete(const boost::system::error_code& ec, std::size_t length) {
     auto destroy = false;
     func_(this, destroy, ec, length);
@@ -65,7 +66,8 @@ class basic_pending_sized_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
                              const boost::system::error_code& ec,
                              std::size_t length);
 
-  explicit basic_pending_sized_io_operation(func_type func) : next_(nullptr), func_(func) {}
+  explicit basic_pending_sized_io_operation(func_type func)
+      : next_(nullptr), func_(func) {}
 
   ~basic_pending_sized_io_operation() = default;
 
@@ -74,7 +76,7 @@ class basic_pending_sized_io_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER {
   func_type func_;
 };
 
-}  // io
-}  // connected_protocol
+}  // namespace io
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_IO_OP_H_

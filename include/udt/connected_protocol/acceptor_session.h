@@ -2,15 +2,15 @@
 #define UDT_CONNECTED_PROTOCOL_ACCEPTOR_SESSION_H_
 
 #include <chrono>
-#include <memory>
 #include <iostream>
+#include <memory>
 
 #include <boost/asio/detail/op_queue.hpp>
 #include <boost/asio/socket_base.hpp>
 
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include <boost/uuid/detail/sha1.hpp>
 
@@ -18,8 +18,8 @@
 
 #include "io/accept_op.h"
 
-#include "state/base_state.h"
 #include "state/accepting_state.h"
+#include "state/base_state.h"
 #include "state/closed_state.h"
 
 namespace connected_protocol {
@@ -335,6 +335,6 @@ class AcceptorSession {
   TimePoint start_time_point_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_ACCEPTOR_SESSION_H_

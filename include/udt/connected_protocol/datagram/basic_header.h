@@ -29,7 +29,7 @@ class basic_GenericHeader {
     return buffers;
   }
 
-  void GetConstBuffers(ConstBuffers *p_buffers) const {
+  void GetConstBuffers(ConstBuffers* p_buffers) const {
     p_buffers->push_back(boost::asio::buffer(data_));
   }
 
@@ -39,11 +39,11 @@ class basic_GenericHeader {
     return buffers;
   }
 
-  void GetMutableBuffers(MutableBuffers *p_buffers) {
+  void GetMutableBuffers(MutableBuffers* p_buffers) {
     p_buffers->push_back(boost::asio::buffer(data_));
   }
 
-  DataType &data() { return data_; }
+  DataType& data() { return data_; }
 
   bool IsControlPacket() { return ((ntohl(data_[0]) & type_mask) >> 31) == 1; }
 
@@ -98,7 +98,7 @@ class basic_DataHeader {
 
   basic_DataHeader() : content_() {}
 
-  basic_DataHeader &operator=(basic_DataHeader &&other) {
+  basic_DataHeader& operator=(basic_DataHeader&& other) {
     content_ = std::move(other.content_);
 
     return *this;
@@ -110,7 +110,7 @@ class basic_DataHeader {
     return buffers;
   }
 
-  void GetConstBuffers(ConstBuffers *p_buffers) const {
+  void GetConstBuffers(ConstBuffers* p_buffers) const {
     p_buffers->push_back(boost::asio::buffer(&content_, sizeof(content_)));
   }
 
@@ -120,7 +120,7 @@ class basic_DataHeader {
     return buffers;
   }
 
-  void GetMutableBuffers(MutableBuffers *p_buffers) {
+  void GetMutableBuffers(MutableBuffers* p_buffers) {
     p_buffers->push_back(boost::asio::buffer(&content_, sizeof(content_)));
   }
 
@@ -230,7 +230,7 @@ class basic_ControlHeader {
     return buffers;
   }
 
-  void GetConstBuffers(ConstBuffers *p_buffers) const {
+  void GetConstBuffers(ConstBuffers* p_buffers) const {
     p_buffers->push_back(boost::asio::buffer(&content_, sizeof(content_)));
   }
 
@@ -240,7 +240,7 @@ class basic_ControlHeader {
     return buffers;
   }
 
-  void GetMutableBuffers(MutableBuffers *p_buffers) {
+  void GetMutableBuffers(MutableBuffers* p_buffers) {
     p_buffers->push_back(boost::asio::buffer(&content_, sizeof(content_)));
   }
 
@@ -285,7 +285,7 @@ class basic_ControlHeader {
   Content content_;
 };
 
-}  // datagram
-}  // connected_protocol
+}  // namespace datagram
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_DATAGRAM_BASIC_HEADER_H_

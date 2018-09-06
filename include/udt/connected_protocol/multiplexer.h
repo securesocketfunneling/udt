@@ -4,9 +4,9 @@
 #include <cstdint>
 
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <memory>
-#include <chrono>
 
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/socket_base.hpp>
@@ -15,8 +15,8 @@
 
 #include <boost/optional.hpp>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -24,8 +24,8 @@
 #include <boost/system/error_code.hpp>
 
 #include "../common/error/error.h"
-#include "flow.h"
 #include "cache/connection_info.h"
+#include "flow.h"
 #include "logger/log_entry.h"
 
 namespace connected_protocol {
@@ -64,7 +64,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   using Ptr = std::shared_ptr<Multiplexer>;
 
  public:
-  static Ptr Create(MultiplexerManager *p_manager, NextSocket socket) {
+  static Ptr Create(MultiplexerManager* p_manager, NextSocket socket) {
     return Ptr(new Multiplexer(p_manager, std::move(socket)));
   }
 
@@ -77,7 +77,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  void Stop(boost::system::error_code &ec) {
+  void Stop(boost::system::error_code& ec) {
     if (running_.load()) {
       running_ = false;
       p_worker_.reset();
@@ -90,14 +90,14 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  boost::asio::io_context &get_io_context() { return socket_.get_io_context(); }
+  boost::asio::io_context& get_io_context() { return socket_.get_io_context(); }
 
-  NextEndpoint local_endpoint(boost::system::error_code &ec) {
+  NextEndpoint local_endpoint(boost::system::error_code& ec) {
     return socket_.local_endpoint(ec);
   }
 
-  SocketSessionPtr CreateSocketSession(boost::system::error_code &ec,
-                                       const NextEndpoint &next_remote_endpoint,
+  SocketSessionPtr CreateSocketSession(boost::system::error_code& ec,
+                                       const NextEndpoint& next_remote_endpoint,
                                        SocketId user_socket_id = 0) {
     boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     SocketId id(0);
@@ -125,7 +125,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     return p_session;
   }
 
-  void RemoveSocketSession(const NextEndpoint &next_remote_endpoint,
+  void RemoveSocketSession(const NextEndpoint& next_remote_endpoint,
                            SocketId socket_id = 0) {
     boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
@@ -146,7 +146,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  void SetAcceptor(boost::system::error_code &ec,
+  void SetAcceptor(boost::system::error_code& ec,
                    AcceptorSessionPtr p_acceptor) {
     boost::lock_guard<boost::mutex> lock_acceptor(acceptor_mutex_);
     if (p_acceptor_) {
@@ -174,13 +174,13 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   // High priority sending : use for control packet only
   template <class Datagram, class Handler>
-  void AsyncSendControlPacket(const Datagram &datagram,
-                              const NextEndpoint &next_endpoint,
+  void AsyncSendControlPacket(const Datagram& datagram,
+                              const NextEndpoint& next_endpoint,
                               Handler handler) {
     auto self = this->shared_from_this();
-    auto sent_handler =
-        [handler, self](const boost::system::error_code &sent_ec,
-                        std::size_t length) { handler(sent_ec, length); };
+    auto sent_handler = [handler, self](
+                            const boost::system::error_code& sent_ec,
+                            std::size_t length) { handler(sent_ec, length); };
 
     {
       boost::lock_guard<boost::mutex> lock_socket(socket_mutex_);
@@ -190,8 +190,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   template <class Datagram, class Handler>
-  void AsyncSendDataPacket(Datagram *p_datagram,
-                           const NextEndpoint &next_endpoint, Handler handler) {
+  void AsyncSendDataPacket(Datagram* p_datagram,
+                           const NextEndpoint& next_endpoint, Handler handler) {
     if (p_datagram->is_acked()) {
       this->get_io_context().post(
           boost::asio::detail::binder2<decltype(handler),
@@ -205,7 +205,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     p_datagram->set_pending_send(true);
     auto self = this->shared_from_this();
     auto sent_handler = [p_datagram, handler, self](
-        const boost::system::error_code &sent_ec, std::size_t length) {
+                            const boost::system::error_code& sent_ec,
+                            std::size_t length) {
       p_datagram->set_pending_send(false);
       if (!sent_ec && Logger::ACTIVE) {
         self->sent_count_ = self->sent_count_.load() + 1;
@@ -220,14 +221,14 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  void Log(connected_protocol::logger::LogEntry *p_log) {
+  void Log(connected_protocol::logger::LogEntry* p_log) {
     p_log->multiplexer_sent_count = sent_count_.load();
   }
 
   void ResetLog() { sent_count_ = 0; }
 
  private:
-  Multiplexer(MultiplexerManager *p_manager, NextSocket socket)
+  Multiplexer(MultiplexerManager* p_manager, NextSocket socket)
       : p_manager_(p_manager),
         socket_mutex_(),
         socket_(std::move(socket)),
@@ -264,7 +265,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   void HandlePacket(GenericDatagramPtr p_generic_packet,
                     NextEndpointPtr p_next_remote_endpoint,
-                    const boost::system::error_code &ec, std::size_t length) {
+                    const boost::system::error_code& ec, std::size_t length) {
     if (!running_.load()) {
       return;
     }
@@ -277,7 +278,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       return;
     }
 
-    auto &header = p_generic_packet->header();
+    auto& header = p_generic_packet->header();
     auto p_socket_session_optional(
         GetSocketSession(*p_next_remote_endpoint, header.GetSocketId()));
 
@@ -292,8 +293,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       DataDatagram data_datagram;
       boost::asio::buffer_copy(data_datagram.header().GetMutableBuffers(),
                                p_generic_packet->header().GetConstBuffers());
-      auto &data_payload = data_datagram.payload();
-      auto &received_payload = p_generic_packet->payload();
+      auto& data_payload = data_datagram.payload();
+      auto& received_payload = p_generic_packet->payload();
       data_payload = std::move(received_payload);
       p_generic_packet.reset();
       // Forward DataDatagram
@@ -345,7 +346,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
   }
 
-  bool IsSocketIdAvailable(const NextEndpoint &next_remote_endpoint,
+  bool IsSocketIdAvailable(const NextEndpoint& next_remote_endpoint,
                            SocketId socket_id) {
     boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     typename RemoteEndpointFlowMap::const_iterator r_ep_flow_it(
@@ -359,7 +360,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     return session_it == r_ep_flow_it->second.end();
   }
 
-  SocketId GenerateSocketId(const NextEndpoint &next_remote_endpoint) {
+  SocketId GenerateSocketId(const NextEndpoint& next_remote_endpoint) {
     boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     boost::random::uniform_int_distribution<uint32_t> dist(
         1, std::numeric_limits<uint32_t>::max());
@@ -375,7 +376,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   boost::optional<SocketSessionPtr> GetSocketSession(
-      const NextEndpoint &next_remote_endpoint, SocketId socket_id) {
+      const NextEndpoint& next_remote_endpoint, SocketId socket_id) {
     boost::lock_guard<boost::recursive_mutex> lock_sessions(sessions_mutex_);
     boost::optional<SocketSessionPtr> session_optional;
 
@@ -392,7 +393,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     return session_optional;
   }
 
-  FlowPtr GetFlow(const NextEndpoint &next_remote_endpoint) {
+  FlowPtr GetFlow(const NextEndpoint& next_remote_endpoint) {
     boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
     typename FlowsMap::const_iterator flow_it(
         flows_.find(next_remote_endpoint));
@@ -406,7 +407,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     return p_flow;
   }
 
-  void RemoveFlow(const NextEndpoint &next_remote_endpoint) {
+  void RemoveFlow(const NextEndpoint& next_remote_endpoint) {
     boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
     typename FlowsMap::iterator flow_it(flows_.find(next_remote_endpoint));
     if (flow_it == flows_.end()) {
@@ -417,7 +418,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
  private:
-  MultiplexerManager *p_manager_;
+  MultiplexerManager* p_manager_;
   boost::mutex socket_mutex_;
   NextSocket socket_;
   std::unique_ptr<boost::asio::io_context::work> p_worker_;
@@ -432,6 +433,6 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   std::atomic<uint32_t> sent_count_;
 };
 
-}  // connected_protocol
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_MULTIPLEXER_H_

@@ -9,8 +9,8 @@
 
 #include <boost/circular_buffer.hpp>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
 
 namespace connected_protocol {
 namespace state {
@@ -50,8 +50,7 @@ class PacketTimeHistoryWindow {
 
   void OnArrival() {
     boost::lock_guard<boost::mutex> lock_arrival(arrival_mutex_);
-    TimePoint arrival_time(
-        std::chrono::high_resolution_clock::now());
+    TimePoint arrival_time(std::chrono::high_resolution_clock::now());
     MicrosecUnit delta(DeltaTime(arrival_time, last_arrival_));
     arrival_interval_history_.push_back(delta);
     last_arrival_ = arrival_time;
@@ -64,8 +63,7 @@ class PacketTimeHistoryWindow {
 
   void OnSecondProbe() {
     boost::lock_guard<boost::mutex> lock_probe(probe_mutex_);
-    TimePoint arrival_time(
-        std::chrono::high_resolution_clock::now());
+    TimePoint arrival_time(std::chrono::high_resolution_clock::now());
 
     probe_interval_history_.push_back(
         DeltaTime(arrival_time, first_probe_arrival_));
@@ -129,7 +127,7 @@ class PacketTimeHistoryWindow {
   }
 
  private:
-  MicrosecUnit DeltaTime(const TimePoint &t1, const TimePoint &t2) {
+  MicrosecUnit DeltaTime(const TimePoint& t1, const TimePoint& t2) {
     return std::chrono::duration_cast<std::chrono::microseconds>(t1 - t2)
         .count();
   }
@@ -147,8 +145,8 @@ class PacketTimeHistoryWindow {
   TimePoint first_probe_arrival_;
 };
 
-}  // connected
-}  // state
-}  // connected_protocol
+}  // namespace connected
+}  // namespace state
+}  // namespace connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_STATE_CONNECTED_PACKET_TIME_HISTORY_WINDOW_H_
