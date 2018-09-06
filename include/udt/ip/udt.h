@@ -8,6 +8,8 @@
 #include "../connected_protocol/logger/no_log.h"
 #include "../connected_protocol/protocol.h"
 
+#define IPPROTO_UDT		133		/* SCTP+1 */
+
 namespace ip {
 
 template <class Logger = connected_protocol::logger::NoLog,
@@ -26,7 +28,7 @@ class udt : public connected_protocol::Protocol<udt<>, boost::asio::ip::udp,
   int type() const { return BOOST_ASIO_OS_DEF(SOCK_STREAM); }
 
   /// Obtain an identifier for the protocol.
-  int protocol() const { return BOOST_ASIO_OS_DEF(IPPROTO_IP); }
+  int protocol() const { return IPPROTO_UDT; }
 
   /// Obtain an identifier for the protocol family.
   int family() const { return family_; }
