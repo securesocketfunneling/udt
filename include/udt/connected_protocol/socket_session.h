@@ -8,11 +8,13 @@
 #include <memory>
 #include <set>
 
+#include <boost/bind.hpp>
+
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/socket_base.hpp>
 
-#include <chrono>
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "io/connect_op.h"
 #include "io/write_op.h"
@@ -177,18 +179,18 @@ class SocketSession
 
   // State management
   void SetAcceptor(AcceptorSession* p_acceptor) {
-    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(acceptor_mutex_);
     p_acceptor_ = p_acceptor;
   }
 
   void RemoveAcceptor() {
-    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(acceptor_mutex_);
     p_acceptor_ = nullptr;
   }
 
   // Change session's current state
   void ChangeState(BaseStatePtr p_new_state) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     auto p_state = p_state_;
     if (p_state) {
       p_state->Stop();
@@ -211,21 +213,21 @@ class SocketSession
   SocketId socket_id() const { return socket_id_; }
 
   void set_socket_id(SocketId socket_id) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     socket_id_ = socket_id;
   }
 
   SocketId remote_socket_id() const { return remote_socket_id_; }
 
   void set_remote_socket_id(SocketId remote_socket_id) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     remote_socket_id_ = remote_socket_id;
   }
 
   uint32_t syn_cookie() const { return syn_cookie_; }
 
   void set_syn_cookie(uint32_t syn_cookie) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     syn_cookie_ = syn_cookie;
   }
 
@@ -242,14 +244,14 @@ class SocketSession
   const SequenceGenerator& packet_seq_gen() const { return packet_seq_gen_; }
 
   void set_timeout_delay(uint32_t delay) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     timeout_delay_ = delay;
   }
 
   uint32_t timeout_delay() const { return timeout_delay_; }
 
   void set_start_timestamp(const TimePoint& start) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     start_timestamp_ = start;
   }
 
@@ -258,21 +260,21 @@ class SocketSession
   uint32_t max_window_flow_size() const { return max_window_flow_size_; }
 
   void set_max_window_flow_size(uint32_t max_window_flow_size) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     max_window_flow_size_ = max_window_flow_size;
   }
 
   uint32_t window_flow_size() const { return window_flow_size_; }
 
   void set_window_flow_size(uint32_t window_flow_size) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     window_flow_size_ = window_flow_size;
   }
 
   uint32_t init_packet_seq_num() const { return init_packet_seq_num_; }
 
   void set_init_packet_seq_num(uint32_t init_packet_seq_num) {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     init_packet_seq_num_ = init_packet_seq_num;
   }
 
@@ -281,7 +283,7 @@ class SocketSession
   ConnectionInfo* get_p_connection_info() { return &connection_info_; }
 
   void UpdateCacheConnection() {
-    boost::recursive_mutex::scoped_lock lock_session(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_session(mutex_);
     auto connection_cache = p_connection_info_cache_.lock();
     if (connection_cache) {
       connection_cache->Update(connection_info_);
@@ -379,7 +381,7 @@ class SocketSession
   }
 
   void NotifyAcceptor() {
-    boost::recursive_mutex::scoped_lock lock(acceptor_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(acceptor_mutex_);
     if (p_acceptor_) {
       p_acceptor_->Notify(this);
     }

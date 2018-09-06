@@ -8,8 +8,10 @@
 #include <boost/asio/detail/op_queue.hpp>
 #include <boost/asio/socket_base.hpp>
 
-
 #include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
+
 #include <boost/uuid/detail/sha1.hpp>
 
 #include "../common/error/error.h"
@@ -66,7 +68,7 @@ class AcceptorSession {
   bool IsListening() { return listening_; }
 
   void Listen(int backlog, boost::system::error_code& ec) {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(mutex_);
     if (!listening_) {
       listening_ = true;
       max_pending_connections_ =
@@ -82,7 +84,7 @@ class AcceptorSession {
   void StopListen() { listening_ = false; }
 
   NextLayerEndpoint next_local_endpoint(boost::system::error_code& ec) {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(mutex_);
     if (!p_multiplexer_) {
       ec.assign(::common::error::no_link,
                 ::common::error::get_error_category());
@@ -93,7 +95,7 @@ class AcceptorSession {
   }
 
   void Close() {
-    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions_accept_ops(mutex_);
     if (!p_multiplexer_) {
       return;
     }
@@ -118,7 +120,7 @@ class AcceptorSession {
 
   void PushAcceptOp(AcceptOp* p_accept_op) {
     {
-      boost::recursive_mutex::scoped_lock lock_accept_ops(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock_accept_ops(mutex_);
       accept_ops_.push(p_accept_op);
     }
 
@@ -127,7 +129,7 @@ class AcceptorSession {
 
   void PushConnectionDgr(ConnectionDatagramPtr p_connection_dgr,
                          NextLayerEndpointPtr p_remote_endpoint) {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock(mutex_);
     if (!p_multiplexer_) {
       return;
     }
@@ -174,7 +176,7 @@ class AcceptorSession {
       p_socket_session->ChangeState(AcceptingState::Create(p_socket_session));
 
       {
-        boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
+        boost::lock_guard<boost::recursive_mutex> lock_sessions(mutex_);
         connecting_sessions_[remote_socket_id] = p_socket_session;
       }
     }
@@ -185,7 +187,7 @@ class AcceptorSession {
   void Notify(typename Protocol::socket_session* p_subject) {
     if (p_subject->GetState() ==
         connected_protocol::state::BaseState<Protocol>::CONNECTED) {
-      boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock_sessions(mutex_);
       auto connecting_it =
           connecting_sessions_.find(p_subject->remote_socket_id());
 
@@ -204,7 +206,7 @@ class AcceptorSession {
 
     if (p_subject->GetState() ==
         connected_protocol::state::BaseState<Protocol>::CLOSED) {
-      boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock_sessions(mutex_);
       connecting_sessions_.erase(p_subject->remote_socket_id());
       connected_sessions_.erase(p_subject->remote_socket_id());
       previous_connected_sessions_.erase(p_subject->remote_socket_id());
@@ -215,7 +217,7 @@ class AcceptorSession {
 
  private:
   void Accept() {
-    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions_accept_ops(mutex_);
     if (!p_multiplexer_) {
       return;
     }
@@ -244,7 +246,7 @@ class AcceptorSession {
 
   /// Pop and post accept ops with the given error code
   void CleanAcceptOps(const boost::system::error_code& ec) {
-    boost::recursive_mutex::scoped_lock lock_sessions_accept_ops(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions_accept_ops(mutex_);
     if (!p_multiplexer_) {
       return;
     }
@@ -260,7 +262,7 @@ class AcceptorSession {
   }
 
   SocketSessionPtr GetSession(SocketId remote_socket_id) {
-    boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions(mutex_);
     auto connecting_it = connecting_sessions_.find(remote_socket_id);
     if (connecting_it != connecting_sessions_.end()) {
       return connecting_it->second;
@@ -281,7 +283,7 @@ class AcceptorSession {
   void HandleFirstHandshakePacket(
       ConnectionDatagramPtr p_connection_dgr,
       const NextLayerEndpoint& next_remote_endpoint) {
-    boost::recursive_mutex::scoped_lock lock_sessions(mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions(mutex_);
     if (!p_multiplexer_) {
       return;
     }

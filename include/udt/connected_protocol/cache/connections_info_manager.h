@@ -8,6 +8,7 @@
 #include <string>
 
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "connection_info.h"
 
@@ -33,7 +34,7 @@ class ConnectionsInfoManager {
         connections_info_() {}
 
   std::weak_ptr<ConnectionInfo> GetConnectionInfo(const NextEndpoint& next_endpoint) {
-    boost::recursive_mutex::scoped_lock lock_connections(connections_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_connections(connections_mutex_);
     std::string address(next_endpoint.address().to_string());
     ConnectionsInfoMap::iterator connection_info_it(
         connections_info_.find(address));
@@ -53,7 +54,7 @@ class ConnectionsInfoManager {
 
  private:
   void FreeItem() {
-    boost::recursive_mutex::scoped_lock lock_connections(connections_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_connections(connections_mutex_);
     ConnectionsInfoMap::iterator oldest_pair_it(connections_info_.begin());
     ConnectionsInfoMap::iterator current_pair_it(oldest_pair_it);
     ConnectionsInfoMap::iterator end_pair_it(connections_info_.end());

@@ -7,13 +7,13 @@
 #include <map>
 #include <numeric>
 #include <queue>
+#include <chrono>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 
-#include <chrono>
-
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 namespace connected_protocol {
 namespace state {
@@ -35,7 +35,7 @@ class AckHistoryWindow {
         ack_timestamps_(size) {}
 
   void StoreAck(AckSequenceNumber ack_num, PacketSequenceNumber packet_num) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     uint32_t window_size =
         static_cast<uint32_t>(packet_sequence_numbers_.size());
     ack_sequence_numbers_[current_index_] = ack_num;
@@ -50,7 +50,7 @@ class AckHistoryWindow {
   bool Acknowledge(AckSequenceNumber ack_seq_num,
                    PacketSequenceNumber* p_packet_seq_num,
                    std::chrono::microseconds* p_rtt) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     uint32_t window_size =
         static_cast<uint32_t>(packet_sequence_numbers_.size());
     if (current_index_ >= oldest_index_) {

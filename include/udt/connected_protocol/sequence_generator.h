@@ -6,10 +6,8 @@
 
 #include <chrono>
 
-#include <chrono>
-
-
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -35,19 +33,19 @@ class SequenceGenerator {
   }
 
   SeqNumber Previous() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     current_ = Dec(current_);
     return current_;
   }
 
   SeqNumber Next() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     current_ = Inc(current_);
     return current_;
   }
 
   void set_current(SeqNumber current) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     if (current > max_value_) {
       current_ = 0;
     } else {
@@ -56,7 +54,7 @@ class SequenceGenerator {
   }
 
   SeqNumber current() const {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return current_;
   }
 

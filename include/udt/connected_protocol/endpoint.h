@@ -2,6 +2,10 @@
 #define UDT_CONNECTED_PROTOCOL_ENDPOINT_H_
 
 #include <cstdint>
+#include <utility>
+
+#include <boost/asio/detail/socket_types.hpp>
+#include <boost/asio/ip/address.hpp>
 
 namespace connected_protocol {
 
@@ -16,6 +20,9 @@ class Endpoint {
 
  public:
   Endpoint() : socket_id_(0), next_layer_endpoint_() {}
+
+  Endpoint(const boost::asio::ip::address& addr, unsigned short port_num)
+      : socket_id_{0}, next_layer_endpoint_{addr, port_num} {}
 
   Endpoint(SocketId socket_id, const NextLayerEndpoint& next_layer_endpoint)
       : socket_id_(socket_id), next_layer_endpoint_(next_layer_endpoint) {}
@@ -42,7 +49,13 @@ class Endpoint {
     return *this;
   }
 
-  protocol_type protocol() const { return protocol_type(); }
+  protocol_type protocol() const {
+      if (next_layer_endpoint_.protocol() == NextLayer::v4()) {
+          return protocol_type::v4();
+      } else {
+          return protocol_type::v6();
+      }
+  }
 
   SocketId socket_id() const { return socket_id_; }
 

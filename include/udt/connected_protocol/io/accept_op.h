@@ -103,8 +103,9 @@ class pending_accept_operation
     pending_accept_operation* o(static_cast<pending_accept_operation*>(base));
 
     ptr p = {boost::asio::detail::addressof(o->handler_), o, o};
+    boost::asio::detail::handler_work<Handler> w(o->handler_);
 
-    BOOST_ASIO_HANDLER_COMPLETION((o));
+    BOOST_ASIO_HANDLER_COMPLETION((*o));
 
     // Make a copy of the handler so that the memory can be deallocated before
     // the upcall is made. Even if we're not about to make an upcall, a
@@ -122,13 +123,83 @@ class pending_accept_operation
       boost::asio::detail::fenced_block b(
           boost::asio::detail::fenced_block::half);
       BOOST_ASIO_HANDLER_INVOCATION_BEGIN((handler.arg1_));
-      boost_asio_handler_invoke_helpers::invoke(handler, handler.handler_);
+      w.complete(handler, handler.handler_);
       BOOST_ASIO_HANDLER_INVOCATION_END;
     }
   }
 
  private:
   Handler handler_;
+};
+
+template <typename Handler, typename Protocol>
+class pending_move_accept_operation
+:   private Protocol::socket,
+    public basic_pending_accept_operation<Protocol> {
+  private:
+    using socket_type =
+    typename basic_pending_accept_operation<Protocol>::socket_type;
+    using endpoint_type =
+    typename basic_pending_accept_operation<Protocol>::endpoint_type;
+
+  public:
+    BOOST_ASIO_DEFINE_HANDLER_PTR(pending_move_accept_operation);
+
+    /// Constructor
+    /**
+    * @param impl The socket implementation of the accepted socket
+    * @param p_endpoint The remote endpoint of the accepted socket
+    * @param handler The handler to call upon completion
+    */
+    pending_move_accept_operation(boost::asio::io_context& ioc,
+                                  endpoint_type* p_endpoint,
+                                  Handler handler)
+    : Protocol::socket(ioc),
+      basic_pending_accept_operation<Protocol>(&pending_move_accept_operation::do_complete, *this, p_endpoint),
+      handler_(BOOST_ASIO_MOVE_CAST(Handler)(handler)) {}
+
+    /// Implementation of the completion callback
+    /**
+    * @param base A pointer to the base class
+    * @param destroy A boolean to decide if the op should be destroyed
+    * @param result_ec The error_code of the operation
+    */
+    static void do_complete(basic_pending_io_operation* base, bool destroy,
+                            const boost::system::error_code& result_ec) {
+        boost::system::error_code ec(result_ec);
+
+        // take ownership of the operation object
+        pending_move_accept_operation* o(static_cast<pending_move_accept_operation*>(base));
+
+        ptr p = {boost::asio::detail::addressof(o->handler_), o, o};
+        boost::asio::detail::handler_work<Handler> w(o->handler_);
+
+        BOOST_ASIO_HANDLER_COMPLETION((*o));
+
+        // Make a copy of the handler so that the memory can be deallocated before
+        // the upcall is made. Even if we're not about to make an upcall, a
+        // sub-object of the handler may be the true owner of the memory associated
+        // with the handler. Consequently, a local copy of the handler is required
+        // to ensure that any owning sub-object remains valid until after we have
+        // deallocated the memory here.
+        boost::asio::detail::move_binder2<Handler,
+                             boost::system::error_code, typename Protocol::socket>
+        handler(0, BOOST_ASIO_MOVE_CAST(Handler)(o->handler_), ec,
+                BOOST_ASIO_MOVE_CAST(typename Protocol::socket)(*o));
+        p.h = boost::asio::detail::addressof(handler.handler_);
+        p.reset();
+
+        // Make the upcall if required.
+        if (!destroy) {
+          boost::asio::detail::fenced_block b(boost::asio::detail::fenced_block::half);
+          BOOST_ASIO_HANDLER_INVOCATION_BEGIN((handler.arg1_, "..."));
+          w.complete(handler, handler.handler_);
+          BOOST_ASIO_HANDLER_INVOCATION_END;
+        }
+    }
+
+  private:
+    Handler handler_;
 };
 
 }  // io

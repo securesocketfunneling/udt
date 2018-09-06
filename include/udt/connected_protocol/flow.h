@@ -10,12 +10,12 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/io_context.hpp>
 
-
-
 #include <boost/bind.hpp>
 
 #include <boost/system/error_code.hpp>
+
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "logger/log_entry.h"
 
@@ -69,7 +69,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
   void RegisterNewSocket(typename SocketSession::Ptr p_session) {
     {
-      boost::recursive_mutex::scoped_lock lock(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock(mutex_);
       auto inserted = socket_sessions_.insert(p_session);
       if (inserted.second) {
         // relaunch timer since there is a new socket
@@ -111,7 +111,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
     }
 
     {
-      boost::recursive_mutex::scoped_lock lock_socket_sessions(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock_socket_sessions(mutex_);
       if (socket_sessions_.empty()) {
         this->StopPullSocketQueue();
         return;
@@ -161,7 +161,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
     typename SocketSession::Ptr p_session;
     Datagram* p_datagram;
     {
-      boost::recursive_mutex::scoped_lock lock_socket_sessions(mutex_);
+      boost::lock_guard<boost::recursive_mutex> lock_socket_sessions(mutex_);
 
       if (socket_sessions_.empty()) {
         StopPullSocketQueue();

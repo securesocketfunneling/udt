@@ -255,7 +255,7 @@ void TestStreamProtocol(
     }
 
     {
-      boost::mutex::scoped_lock lock_first_received1(first_received_mutex1);
+      boost::lock_guard<boost::mutex> lock_first_received1(first_received_mutex1);
       if (first_received_socket_1) {
         REQUIRE(tests::helpers::CheckHalfBuffers(buffer2, r_buffer1, true));
         tests::helpers::ResetBuffer(&r_buffer1, 0);
@@ -297,7 +297,7 @@ void TestStreamProtocol(
     REQUIRE(0 == ec.value());
 
     {
-      boost::mutex::scoped_lock lock_first_received2(first_received_mutex2);
+      boost::lock_guard<boost::mutex> lock_first_received2(first_received_mutex2);
       if (first_received_socket_2) {
         REQUIRE(tests::helpers::CheckHalfBuffers(buffer1, r_buffer2, true));
         tests::helpers::ResetBuffer(&r_buffer1, 0);

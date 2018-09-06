@@ -8,8 +8,9 @@
 #include <numeric>
 
 #include <boost/circular_buffer.hpp>
-#include <chrono>
+
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 namespace connected_protocol {
 namespace state {
@@ -48,7 +49,7 @@ class PacketTimeHistoryWindow {
   }
 
   void OnArrival() {
-    boost::mutex::scoped_lock lock_arrival(arrival_mutex_);
+    boost::lock_guard<boost::mutex> lock_arrival(arrival_mutex_);
     TimePoint arrival_time(
         std::chrono::high_resolution_clock::now());
     MicrosecUnit delta(DeltaTime(arrival_time, last_arrival_));
@@ -57,12 +58,12 @@ class PacketTimeHistoryWindow {
   }
 
   void OnFirstProbe() {
-    boost::mutex::scoped_lock lock_probe(probe_mutex_);
+    boost::lock_guard<boost::mutex> lock_probe(probe_mutex_);
     first_probe_arrival_ = std::chrono::high_resolution_clock::now();
   }
 
   void OnSecondProbe() {
-    boost::mutex::scoped_lock lock_probe(probe_mutex_);
+    boost::lock_guard<boost::mutex> lock_probe(probe_mutex_);
     TimePoint arrival_time(
         std::chrono::high_resolution_clock::now());
 
@@ -72,7 +73,7 @@ class PacketTimeHistoryWindow {
 
   /// @return packets per second
   double GetPacketArrivalSpeed() {
-    boost::mutex::scoped_lock lock_arrival(arrival_mutex_);
+    boost::lock_guard<boost::mutex> lock_arrival(arrival_mutex_);
     // copy values
     std::vector<MicrosecUnit> sorted_values(arrival_interval_history_.begin(),
                                             arrival_interval_history_.end());
@@ -100,7 +101,7 @@ class PacketTimeHistoryWindow {
 
   /// @return packets per second
   double GetEstimatedLinkCapacity() {
-    boost::mutex::scoped_lock lock_probe(probe_mutex_);
+    boost::lock_guard<boost::mutex> lock_probe(probe_mutex_);
     // copy values
     std::vector<MicrosecUnit> sorted_values(probe_interval_history_.begin(),
                                             probe_interval_history_.end());

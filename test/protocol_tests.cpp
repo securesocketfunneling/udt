@@ -6,9 +6,9 @@ using udt_protocol = ip::udt<>;
 
 /// Test ASIO protocol requirements
 TEST_CASE("UDTProtocol") {
-  udt_protocol protocol1;
+  udt_protocol protocol1 = udt_protocol::v4();
   udt_protocol protocol2(protocol1);
-  udt_protocol protocol3;
+  udt_protocol protocol3 = udt_protocol::v4();
 
   protocol3 = protocol2;
 

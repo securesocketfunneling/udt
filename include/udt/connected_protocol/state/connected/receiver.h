@@ -7,13 +7,13 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <chrono>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/basic_waitable_timer.hpp>
 
-#include <chrono>
-
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "../../../common/error/error.h"
 #include "../../io/buffers.h"
@@ -76,7 +76,7 @@ class Receiver {
     }
 
     p_state_ = p_state;
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     last_exp_reset_timestamp_ = Clock::now();
 
     lrsn_ = initial_packet_seq_num - 1;
@@ -125,7 +125,7 @@ class Receiver {
     }
 
     {
-      boost::mutex::scoped_lock lock_packets_received(packets_received_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_received(packets_received_mutex_);
       if (!packets_received_.empty()) {
         auto &begin_pair = *(packets_received_.begin());
         auto first_seq_num_received_buffer = begin_pair.first;
@@ -144,7 +144,7 @@ class Receiver {
     }
 
     {
-      boost::mutex::scoped_lock lock(mutex_);
+      boost::lock_guard<boost::mutex> lock(mutex_);
       if (packet_seq_gen.Compare(packet_seq_num,
                                  packet_seq_gen.Inc(lrsn_.load())) > 0) {
         uint32_t i = packet_seq_gen.Inc(lrsn_.load());
@@ -178,7 +178,7 @@ class Receiver {
     }
 
     {
-      boost::mutex::scoped_lock lock_packets_received(packets_received_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_received(packets_received_mutex_);
       packets_received_[packet_seq_num] = std::move(*p_datagram);
     }
 
@@ -203,7 +203,7 @@ class Receiver {
 
   // @return buffer size in bytes
   uint32_t AvailableReceiveBufferSize() {
-    boost::mutex::scoped_lock lock(packets_received_mutex_);
+    boost::lock_guard<boost::mutex> lock(packets_received_mutex_);
     return max_received_size_ - static_cast<uint32_t>(packets_received_.size());
   }
 
@@ -218,7 +218,7 @@ class Receiver {
   void IncExpCounter() { exp_count_ = exp_count_.load() + 1; }
 
   void ResetExpCounter() {
-    boost::mutex::scoped_lock lock_exp(mutex_);
+    boost::lock_guard<boost::mutex> lock_exp(mutex_);
     exp_count_ = 1;
     last_exp_reset_timestamp_ = Clock::now();
   }
@@ -226,7 +226,7 @@ class Receiver {
   uint64_t exp_count() { return exp_count_.load(); }
 
   bool HasTimeout() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return exp_count_.load() > 16 &&
            std::chrono::duration_cast<std::chrono::seconds>(
                Clock::now() - last_exp_reset_timestamp_)
@@ -240,7 +240,7 @@ class Receiver {
     }
 
     {
-      boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
+      boost::lock_guard<boost::mutex> lock_read_ops(read_ops_mutex_);
       read_ops_queue_.push(read_op);
     }
     p_session->get_io_context().post(boost::bind(
@@ -248,7 +248,7 @@ class Receiver {
   }
 
   PacketSequenceNumber AckNumber(const SequenceGenerator &packet_seq_gen) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     if (loss_list_.empty()) {
       return packet_seq_gen.Inc(lrsn_.load());
     } else {
@@ -258,44 +258,44 @@ class Receiver {
 
   void set_largest_acknowledged_seq_number(
       PacketSequenceNumber largest_acknowledged_seq_number) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     largest_acknowledged_seq_number_ = largest_acknowledged_seq_number;
   }
 
   PacketSequenceNumber largest_acknowledged_seq_number() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return largest_acknowledged_seq_number_;
   }
 
   void set_largest_ack_number_acknowledged(
       PacketSequenceNumber largest_ack_number_acknowledged) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     largest_ack_number_acknowledged_ = largest_ack_number_acknowledged;
   }
 
   PacketSequenceNumber largest_ack_number_acknowledged() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return largest_ack_number_acknowledged_;
   }
 
   void set_last_ack2_seq_number(AckSequenceNumber last_ack2_seq_number) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     last_ack2_seq_number_ = last_ack2_seq_number;
     last_ack2_timestamp_ = Clock::now();
   }
 
   void set_last_ack_number(PacketSequenceNumber last_ack_number) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     last_ack_number_ = last_ack_number;
   }
 
   PacketSequenceNumber last_ack_number() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return last_ack_number_;
   }
 
   TimePoint last_ack_timestamp() {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     return last_ack_timestamp_;
   }
 
@@ -307,8 +307,8 @@ class Receiver {
       return;
     }
 
-    boost::mutex::scoped_lock packet_received_lock(packets_received_mutex_);
-    boost::mutex::scoped_lock read_ops_lock_(read_ops_mutex_);
+    boost::lock_guard<boost::mutex> packet_received_lock(packets_received_mutex_);
+    boost::lock_guard<boost::mutex> read_ops_lock_(read_ops_mutex_);
 
     if (read_ops_queue_.empty() || packets_received_.empty()) {
       return;
@@ -382,7 +382,7 @@ class Receiver {
       return;
     }
 
-    boost::mutex::scoped_lock lock_read_ops(read_ops_mutex_);
+    boost::lock_guard<boost::mutex> lock_read_ops(read_ops_mutex_);
     // Unqueue read ops queue and callback with error code
     io::basic_pending_stream_read_operation<Protocol> *p_read_op;
     while (!read_ops_queue_.empty()) {

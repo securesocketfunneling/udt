@@ -15,11 +15,11 @@ namespace connected_protocol {
 
 #include <boost/asio/detail/push_options.hpp>
 
-template <class Prococol>
+template <typename Protocol>
 class socket_acceptor_service : public boost::asio::detail::service_base<
-                                    socket_acceptor_service<Prococol>> {
+                                    socket_acceptor_service<Protocol>> {
  public:
-  using protocol_type = Prococol;
+  using protocol_type = Protocol;
   using endpoint_type = typename protocol_type::endpoint;
   using p_endpoint_type = std::shared_ptr<endpoint_type>;
   using resolver_type = typename protocol_type::resolver;
@@ -227,13 +227,57 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
         accept_op_type::ptr::allocate(handler),
         0};
 
-    p.p = new (p.v) accept_op_type(peer, nullptr, handler);
+    p.p = new (p.v) accept_op_type(peer, p_peer_endpoint, handler);
 
     impl.p_acceptor->PushAcceptOp(p.p);
 
     p.v = p.p = 0;
 
     return init.result.get();
+  }
+
+    /// Start an asynchronous accept.
+  template <typename MoveAcceptHandler>
+  void async_accept(implementation_type& impl,
+      boost::asio::io_context* peer_io_context, endpoint_type* peer_endpoint,
+      BOOST_ASIO_MOVE_ARG(MoveAcceptHandler) handler)
+  {
+    boost::asio::async_completion<MoveAcceptHandler,
+      void (boost::system::error_code,
+        typename Protocol::socket)> init(handler);
+
+    // TODO: This error handling should be done in the async part
+//      if (!is_open(impl)) {
+//          this->get_io_context().post(
+//          boost::asio::detail::binder2<MoveAcceptHandler,
+//                                       boost::system::error_code, typename Protocol::socket>(
+//          handler, boost::system::error_code(
+//          ::common::error::broken_pipe,
+//          ::common::error::get_error_category()), typename Protocol::socket(peer_io_context ? *peer_io_context : this->get_io_context())));
+//          return init.result.get();
+//      }
+//
+//      if (!impl.p_multiplexer) {
+//          this->get_io_context().post(
+//          boost::asio::detail::binder2<MoveAcceptHandler,
+//                                       boost::system::error_code, typename Protocol::socket>(
+//          handler, boost::system::error_code(
+//          ::common::error::bad_address,
+//          ::common::error::get_error_category()), typename Protocol::socket(peer_io_context ? *peer_io_context : this->get_io_context())));
+//          return init.result.get();
+//      }
+
+      typedef io::pending_move_accept_operation<MoveAcceptHandler, protocol_type> move_accept_op_type;
+      typename move_accept_op_type::ptr p = {
+      boost::asio::detail::addressof(handler),
+      move_accept_op_type::ptr::allocate(handler),
+      0};
+
+      p.p = new (p.v) move_accept_op_type(peer_io_context ? *peer_io_context : this->get_io_context(), peer_endpoint, handler);
+
+      impl.p_acceptor->PushAcceptOp(p.p);
+
+      p.v = p.p = 0;
   }
 
  private:

@@ -9,11 +9,6 @@ option(UDT_BUILD_APPS "Build the apps is enabled." ON)
 option(UDT_BUILD_TESTS "Build the unit tests when BUILD_TESTING is enabled." ON)
 
 ##
-## CONFIGURATION
-##
-set(CMAKE_CXX_STANDARD 11)
-
-##
 ## Main TARGET
 ## create target and add include path
 ##

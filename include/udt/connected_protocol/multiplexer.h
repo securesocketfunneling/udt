@@ -6,13 +6,17 @@
 #include <atomic>
 #include <map>
 #include <memory>
-
-#include <boost/asio/buffer.hpp>
-
-#include <boost/bind.hpp>
 #include <chrono>
 
+#include <boost/asio/buffer.hpp>
+#include <boost/asio/socket_base.hpp>
+
+#include <boost/bind.hpp>
+
 #include <boost/optional.hpp>
+
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -20,10 +24,8 @@
 #include <boost/system/error_code.hpp>
 
 #include "../common/error/error.h"
-
 #include "flow.h"
 #include "cache/connection_info.h"
-
 #include "logger/log_entry.h"
 
 namespace connected_protocol {
@@ -81,7 +83,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       p_worker_.reset();
 
       {
-        boost::mutex::scoped_lock lock_socket(socket_mutex_);
+        boost::lock_guard<boost::mutex> lock_socket(socket_mutex_);
         socket_.shutdown(boost::asio::socket_base::shutdown_both, ec);
         socket_.close(ec);
       }
@@ -97,7 +99,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   SocketSessionPtr CreateSocketSession(boost::system::error_code &ec,
                                        const NextEndpoint &next_remote_endpoint,
                                        SocketId user_socket_id = 0) {
-    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     SocketId id(0);
     if (user_socket_id == 0) {
       id = GenerateSocketId(next_remote_endpoint);
@@ -125,8 +127,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   void RemoveSocketSession(const NextEndpoint &next_remote_endpoint,
                            SocketId socket_id = 0) {
-    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
-    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
 
     typename RemoteEndpointFlowMap::iterator r_ep_flow_it(
         remote_endpoint_flow_sessions_.find(next_remote_endpoint));
@@ -146,7 +148,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   void SetAcceptor(boost::system::error_code &ec,
                    AcceptorSessionPtr p_acceptor) {
-    boost::mutex::scoped_lock lock_acceptor(acceptor_mutex_);
+    boost::lock_guard<boost::mutex> lock_acceptor(acceptor_mutex_);
     if (p_acceptor_) {
       ec.assign(::common::error::address_in_use,
                 ::common::error::get_error_category());
@@ -160,8 +162,8 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   void RemoveAcceptor() {
-    boost::recursive_mutex::scoped_lock lock_sessions(sessions_mutex_);
-    boost::mutex::scoped_lock lock_acceptor(acceptor_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions(sessions_mutex_);
+    boost::lock_guard<boost::mutex> lock_acceptor(acceptor_mutex_);
 
     p_acceptor_.reset();
 
@@ -181,7 +183,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
                         std::size_t length) { handler(sent_ec, length); };
 
     {
-      boost::mutex::scoped_lock lock_socket(socket_mutex_);
+      boost::lock_guard<boost::mutex> lock_socket(socket_mutex_);
       socket_.async_send_to(datagram.GetConstBuffers(), next_endpoint,
                             sent_handler);
     }
@@ -212,7 +214,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     };
 
     {
-      boost::mutex::scoped_lock lock_socket(socket_mutex_);
+      boost::lock_guard<boost::mutex> lock_socket(socket_mutex_);
       socket_.async_send_to(p_datagram->GetConstBuffers(), next_endpoint,
                             std::move(sent_handler));
     }
@@ -249,7 +251,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
     }
 
     {
-      boost::mutex::scoped_lock lock_socket(socket_mutex_);
+      boost::lock_guard<boost::mutex> lock_socket(socket_mutex_);
       auto p_generic_packet = std::make_shared<GenericDatagram>();
       auto p_next_remote_endpoint = std::make_shared<NextEndpoint>();
 
@@ -320,7 +322,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
         }
 
         {
-          boost::mutex::scoped_lock lock(acceptor_mutex_);
+          boost::lock_guard<boost::mutex> lock(acceptor_mutex_);
           // Check if acceptor exists
           if (p_acceptor_) {
             p_acceptor_->PushConnectionDgr(p_connection_datagram,
@@ -345,7 +347,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   bool IsSocketIdAvailable(const NextEndpoint &next_remote_endpoint,
                            SocketId socket_id) {
-    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     typename RemoteEndpointFlowMap::const_iterator r_ep_flow_it(
         remote_endpoint_flow_sessions_.find(next_remote_endpoint));
     if (r_ep_flow_it == remote_endpoint_flow_sessions_.end()) {
@@ -358,7 +360,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   SocketId GenerateSocketId(const NextEndpoint &next_remote_endpoint) {
-    boost::recursive_mutex::scoped_lock lock_sockets_map(sessions_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sockets_map(sessions_mutex_);
     boost::random::uniform_int_distribution<uint32_t> dist(
         1, std::numeric_limits<uint32_t>::max());
     uint32_t rand_id;
@@ -374,7 +376,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
 
   boost::optional<SocketSessionPtr> GetSocketSession(
       const NextEndpoint &next_remote_endpoint, SocketId socket_id) {
-    boost::recursive_mutex::scoped_lock lock_sessions(sessions_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_sessions(sessions_mutex_);
     boost::optional<SocketSessionPtr> session_optional;
 
     typename RemoteEndpointFlowMap::const_iterator r_ep_flow_it(
@@ -391,7 +393,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   FlowPtr GetFlow(const NextEndpoint &next_remote_endpoint) {
-    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
     typename FlowsMap::const_iterator flow_it(
         flows_.find(next_remote_endpoint));
     if (flow_it != flows_.end()) {
@@ -405,7 +407,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
   }
 
   void RemoveFlow(const NextEndpoint &next_remote_endpoint) {
-    boost::recursive_mutex::scoped_lock lock_flows(flows_mutex_);
+    boost::lock_guard<boost::recursive_mutex> lock_flows(flows_mutex_);
     typename FlowsMap::iterator flow_it(flows_.find(next_remote_endpoint));
     if (flow_it == flows_.end()) {
       return;

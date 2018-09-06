@@ -7,13 +7,13 @@
 #include <queue>
 #include <set>
 #include <unordered_set>
+#include <chrono>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/buffers_iterator.hpp>
 
-#include <chrono>
-
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "../../../common/error/error.h"
 #include "../../io/write_op.h"
@@ -77,7 +77,7 @@ class Sender {
   }
 
   bool HasNackPackets() {
-    boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
+    boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
     return !nack_packets_.empty();
   }
 
@@ -91,7 +91,7 @@ class Sender {
     std::size_t loss_list_size = nack_loss_list.size();
 
     {
-      boost::mutex::scoped_lock lock_loss_packets(loss_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_loss_packets(loss_packets_mutex_);
 
       for (uint32_t i = 0; i < loss_list_size; ++i) {
         PacketSequenceNumber current_seq = nack_loss_list[i];
@@ -130,8 +130,8 @@ class Sender {
     }
 
     {
-      boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
-      boost::mutex::scoped_lock lock_loss_packets(loss_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_loss_packets(loss_packets_mutex_);
 
       if (nack_packets_.empty()) {
         return;
@@ -158,18 +158,18 @@ class Sender {
   }
 
   bool HasLossPackets() {
-    boost::mutex::scoped_lock lock(loss_packets_mutex_);
+    boost::lock_guard<boost::mutex> lock(loss_packets_mutex_);
     return !loss_packets_.empty();
   }
 
   bool HasPacketToSend() {
-    boost::mutex::scoped_lock lock_packets_to_send(packets_to_send_mutex_);
-    boost::mutex::scoped_lock lock(loss_packets_mutex_);
+    boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
+    boost::lock_guard<boost::mutex> lock(loss_packets_mutex_);
     return !packets_to_send_.empty() || !loss_packets_.empty();
   }
 
   std::chrono::nanoseconds NextScheduledPacketTime() {
-    boost::mutex::scoped_lock lock_sending_time(sending_time_mutex_);
+    boost::lock_guard<boost::mutex> lock_sending_time(sending_time_mutex_);
     return next_sending_packet_time_;
   }
 
@@ -182,8 +182,8 @@ class Sender {
     TimePoint start_gen(Clock::now());
 
     {
-      boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
-      boost::mutex::scoped_lock lock_loss_packets(loss_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_loss_packets(loss_packets_mutex_);
 
       // Loss packet first
       while (!loss_packets_.empty()) {
@@ -209,8 +209,8 @@ class Sender {
 
     SendDatagramPtr p_unique_datagram = nullptr;
     {
-      boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
-      boost::mutex::scoped_lock lock_packets_to_send(packets_to_send_mutex_);
+      boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
 
       PacketSequenceNumber seq_num = p_session->packet_seq_gen().current();
       if (!packets_to_send_.empty()) {
@@ -260,8 +260,8 @@ class Sender {
     const auto &packet_seq_gen = p_session->packet_seq_gen();
 
     {
-      boost::mutex::scoped_lock lock_nack_packets(nack_packets_mutex_);
-      boost::mutex::scoped_lock lock_loss_packets(loss_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_nack_packets(nack_packets_mutex_);
+      boost::lock_guard<boost::mutex> lock_loss_packets(loss_packets_mutex_);
       // remove packet whose seq_number < seq_number from sent_packets
       PacketSequenceNumber current_seq_num = packet_seq_gen.Dec(seq_number);
       auto p_nack_packet_it = nack_packets_.find(current_seq_num);
@@ -308,10 +308,10 @@ class Sender {
           std::chrono::duration_cast<std::chrono::nanoseconds>(
               p_congestion_control_->sending_period() - gen_time);
       if (next_interval.count() > 0) {
-        boost::mutex::scoped_lock lock_sending_time(sending_time_mutex_);
+        boost::lock_guard<boost::mutex> lock_sending_time(sending_time_mutex_);
         next_sending_packet_time_ = next_interval;
       } else {
-        boost::mutex::scoped_lock lock_sending_time(sending_time_mutex_);
+        boost::lock_guard<boost::mutex> lock_sending_time(sending_time_mutex_);
         next_sending_packet_time_ = std::chrono::nanoseconds(0);
       }
     }
@@ -476,7 +476,7 @@ class Sender {
   }
 
   bool AddPacket(SendDatagramPtr p_unique_datagram) {
-    boost::mutex::scoped_lock lock_packets_to_send(packets_to_send_mutex_);
+    boost::lock_guard<boost::mutex> lock_packets_to_send(packets_to_send_mutex_);
     if (packets_to_send_.size() > max_send_size_) {
       return false;
     }

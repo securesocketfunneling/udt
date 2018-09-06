@@ -11,6 +11,7 @@
 #include <boost/asio/basic_waitable_timer.hpp>
 #include <boost/asio/detail/socket_option.hpp>
 #include <boost/asio/detail/socket_types.hpp>
+#include <boost/asio/ip/basic_resolver.hpp>
 
 #include <chrono>
 
@@ -26,7 +27,6 @@
 #include "logger/no_log.h"
 #include "multiplexer.h"
 #include "multiplexers_manager.h"
-#include "resolver.h"
 
 #include "socket_session.h"
 #include "acceptor_session.h"
@@ -36,7 +36,7 @@
 
 namespace connected_protocol {
 
-template <class NextLayer, class Logger = logger::NoLog,
+template <class Proto, class NextLayer, class Logger = logger::NoLog,
           template <class> class CongestionControlAlg =
               congestion::CongestionControl>
 class Protocol {
@@ -48,8 +48,8 @@ class Protocol {
   using next_layer_protocol = NextLayer;
 
   // Sessions
-  using socket_session = SocketSession<Protocol>;
-  using acceptor_session = AcceptorSession<Protocol>;
+  using socket_session = SocketSession<Proto>;
+  using acceptor_session = AcceptorSession<Proto>;
   using endpoint_context_type = uint32_t;
 
   // Clock
@@ -74,10 +74,6 @@ class Protocol {
       boost::asio::detail::socket_option::integer<BOOST_ASIO_OS_DEF(SOL_SOCKET),
                                                   TIMEOUT_DELAY>;
 
-  using endpoint = Endpoint<Protocol>;
-
-  using resolver = Resolver<Protocol>;
-
   using multiplexer_manager = MultiplexerManager<Protocol>;
   using multiplexer = Multiplexer<Protocol>;
   using flow = Flow<Protocol>;
@@ -86,12 +82,13 @@ class Protocol {
 
   using logger = Logger;
 
-  using socket =
-      boost::asio::basic_stream_socket<Protocol,
-                                       stream_socket_service<Protocol>>;
-  using acceptor =
-      boost::asio::basic_socket_acceptor<Protocol,
-                                         socket_acceptor_service<Protocol>>;
+  using resolver = boost::asio::ip::basic_resolver<Proto>;
+
+  using endpoint = Endpoint<Proto>;
+
+  using socket = boost::asio::basic_stream_socket<Proto, connected_protocol::stream_socket_service<Proto>>;
+
+  using acceptor = boost::asio::basic_socket_acceptor<Proto, connected_protocol::socket_acceptor_service<Proto>>;
 
   // Datagram types
   using EmptyPayload = datagram::EmptyComponent;
@@ -135,18 +132,17 @@ class Protocol {
   // Data datagram
   using DataDatagram =
       datagram::basic_Datagram<DataHeader, GenericReceivePayload>;
-  using SendDatagram =
-      datagram::basic_Datagram<DataHeader, GenericReceivePayload>;
+  using SendDatagram = DataDatagram;
   using ReceiveDatagram = DataDatagram;
 
  public:
   static MultiplexerManager<Protocol> multiplexers_manager_;
 };
 
-template <class NextLayer, class Logger,
+template <class Proto, class NextLayer, class Logger,
           template <class> class CongestionControlAlg>
-MultiplexerManager<Protocol<NextLayer, Logger, CongestionControlAlg>>
-    Protocol<NextLayer, Logger, CongestionControlAlg>::multiplexers_manager_;
+MultiplexerManager<Protocol<Proto, NextLayer, Logger, CongestionControlAlg>>
+    Protocol<Proto, NextLayer, Logger, CongestionControlAlg>::multiplexers_manager_;
 }  // connected_protocol
 
 #endif  // UDT_CONNECTED_PROTOCOL_PROTOCOL_H_

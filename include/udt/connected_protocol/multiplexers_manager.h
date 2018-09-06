@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 #include "multiplexer.h"
 
@@ -28,7 +29,7 @@ class MultiplexerManager {
   MultiplexerPtr GetMultiplexer(boost::asio::io_context &io_context,
                                    const NextLayerEndpoint &next_local_endpoint,
                                    boost::system::error_code &ec) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     auto multiplexer_it = multiplexers_.find(next_local_endpoint);
     if (multiplexer_it == multiplexers_.end()) {
       NextSocket next_layer_socket(io_context);
@@ -55,7 +56,7 @@ class MultiplexerManager {
   }
 
   void CleanMultiplexer(const NextLayerEndpoint &next_local_endpoint) {
-    boost::mutex::scoped_lock lock(mutex_);
+    boost::lock_guard<boost::mutex> lock(mutex_);
     if (multiplexers_.find(next_local_endpoint) != multiplexers_.end()) {
       boost::system::error_code ec;
       multiplexers_[next_local_endpoint]->Stop(ec);

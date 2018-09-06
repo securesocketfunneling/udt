@@ -19,11 +19,11 @@ namespace connected_protocol {
 
 #include <boost/asio/detail/push_options.hpp>
 
-template <class Prococol>
+template <class Protocol>
 class stream_socket_service : public boost::asio::detail::service_base<
-                                  stream_socket_service<Prococol>> {
+                                  stream_socket_service<Protocol>> {
  public:
-  using protocol_type = Prococol;
+  using protocol_type = Protocol;
 
   struct implementation_type {
     implementation_type()
@@ -214,7 +214,7 @@ class stream_socket_service : public boost::asio::detail::service_base<
       return init.result.get();
     }
 
-    typedef io::pending_connect_operation<decltype(init.completion_handler), protocol_type> connect_op_type;
+    typedef io::pending_connect_operation<ConnectHandler, protocol_type> connect_op_type;
     typename connect_op_type::ptr p = {
         boost::asio::detail::addressof(handler),
         connect_op_type::ptr::allocate(handler),
@@ -232,15 +232,19 @@ class stream_socket_service : public boost::asio::detail::service_base<
   boost::system::error_code set_option(implementation_type& impl,
                                        const SettableSocketOption& option,
                                        boost::system::error_code& ec) {
-    if (!impl.p_session) {
-      impl.timeout = option.value();
-      ec.assign(::common::error::success,
-                ::common::error::get_error_category());
-      return ec;
-    }
+// NOTE: Don't understand this code.
+//    if (!impl.p_session) {
+//      impl.timeout = option.value();
+//      ec.assign(::common::error::success,
+//                ::common::error::get_error_category());
+//      return ec;
+//    }
 
     if (option.name(protocol_type::v4()) == protocol_type::TIMEOUT_DELAY) {
-      impl.p_session->set_timeout_delay(option.value());
+      impl.p_session->set_timeout_delay((uint32_t)(*option.data(protocol_type::v4())));
+    } else {
+      ec.assign(::common::error::function_not_supported,
+                ::common::error::get_error_category());
     }
 
     return ec;
