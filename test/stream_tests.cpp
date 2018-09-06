@@ -8,7 +8,7 @@
 #include <map>
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/spawn.hpp>
+// #include <boost/asio/spawn.hpp>
 #include <boost/asio/use_future.hpp>
 
 #include <boost/asio/socket_base.hpp>
@@ -460,85 +460,85 @@ void TestStreamProtocolFuture(
 }
 
 /// Test a stream protocol spawn interface
-template <class StreamProtocol>
-void TestStreamProtocolSpawn(
-    const typename StreamProtocol::resolver::query& client_query,
-    const typename StreamProtocol::resolver::query& acceptor_query) {
-  std::cout << ">>>> Spawn Test" << std::endl;
-  using Buffer = std::array<uint8_t, 500>;
-  boost::asio::io_context io_context;
-  boost::system::error_code resolve_ec;
-
-  Buffer buffer1;
-  Buffer buffer2;
-  Buffer r_buffer1;
-  Buffer r_buffer2;
-  tests::helpers::ResetBuffer(&buffer1, 1);
-  tests::helpers::ResetBuffer(&buffer2, 2);
-  tests::helpers::ResetBuffer(&r_buffer1, 0);
-  tests::helpers::ResetBuffer(&r_buffer2, 0);
-
-  typename StreamProtocol::socket socket1(io_context);
-  typename StreamProtocol::socket socket2(io_context);
-  typename StreamProtocol::acceptor acceptor(io_context);
-  typename StreamProtocol::resolver resolver(io_context);
-
-  auto acceptor_endpoint_it = resolver.resolve(acceptor_query, resolve_ec);
-  REQUIRE(0 == resolve_ec.value());
-
-  typename StreamProtocol::endpoint acceptor_endpoint(*acceptor_endpoint_it);
-
-  auto remote_endpoint_it = resolver.resolve(client_query, resolve_ec);
-  REQUIRE(0 == resolve_ec.value());
-  typename StreamProtocol::endpoint remote_endpoint(*remote_endpoint_it);
-
-  boost::system::error_code ec;
-
-  acceptor.open();
-  acceptor.bind(acceptor_endpoint, ec);
-  REQUIRE(0 == ec.value());
-  acceptor.listen(100, ec);
-  REQUIRE(0 == ec.value());
-
-  auto lambda2 = [&](boost::asio::yield_context yield) {
-    try {
-      acceptor.async_accept(socket2, yield);
-      boost::asio::async_read(socket2, boost::asio::buffer(r_buffer2), yield);
-      boost::asio::async_write(socket2, boost::asio::buffer(buffer2), yield);
-    } catch (const std::exception& e) {
-      std::cout << e.what() << std::endl;
-    }
-  };
-
-  auto lambda1 = [&](boost::asio::yield_context yield) {
-    try {
-      socket1.async_connect(remote_endpoint, yield);
-      boost::asio::async_write(socket1, boost::asio::buffer(buffer1), yield);
-      boost::asio::async_read(socket1, boost::asio::buffer(r_buffer1), yield);
-
-      socket1.shutdown(boost::asio::socket_base::shutdown_both);
-      socket1.close();
-      REQUIRE_FALSE(socket1.is_open());
-
-      socket2.shutdown(boost::asio::socket_base::shutdown_both);
-      socket2.close();
-      REQUIRE_FALSE(socket2.is_open());
-
-      acceptor.close();
-      REQUIRE_FALSE(acceptor.is_open());
-    } catch (const std::exception& e) {
-      std::cout << e.what() << std::endl;
-    }
-  };
-
-  boost::thread_group threads;
-  boost::asio::spawn(io_context, lambda2);
-  boost::asio::spawn(io_context, lambda1);
-  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
-    threads.create_thread([&io_context]() { io_context.run(); });
-  }
-  threads.join_all();
-}
+// template <class StreamProtocol>
+// void TestStreamProtocolSpawn(
+//    const typename StreamProtocol::resolver::query& client_query,
+//    const typename StreamProtocol::resolver::query& acceptor_query) {
+//  std::cout << ">>>> Spawn Test" << std::endl;
+//  using Buffer = std::array<uint8_t, 500>;
+//  boost::asio::io_context io_context;
+//  boost::system::error_code resolve_ec;
+//
+//  Buffer buffer1;
+//  Buffer buffer2;
+//  Buffer r_buffer1;
+//  Buffer r_buffer2;
+//  tests::helpers::ResetBuffer(&buffer1, 1);
+//  tests::helpers::ResetBuffer(&buffer2, 2);
+//  tests::helpers::ResetBuffer(&r_buffer1, 0);
+//  tests::helpers::ResetBuffer(&r_buffer2, 0);
+//
+//  typename StreamProtocol::socket socket1(io_context);
+//  typename StreamProtocol::socket socket2(io_context);
+//  typename StreamProtocol::acceptor acceptor(io_context);
+//  typename StreamProtocol::resolver resolver(io_context);
+//
+//  auto acceptor_endpoint_it = resolver.resolve(acceptor_query, resolve_ec);
+//  REQUIRE(0 == resolve_ec.value());
+//
+//  typename StreamProtocol::endpoint acceptor_endpoint(*acceptor_endpoint_it);
+//
+//  auto remote_endpoint_it = resolver.resolve(client_query, resolve_ec);
+//  REQUIRE(0 == resolve_ec.value());
+//  typename StreamProtocol::endpoint remote_endpoint(*remote_endpoint_it);
+//
+//  boost::system::error_code ec;
+//
+//  acceptor.open();
+//  acceptor.bind(acceptor_endpoint, ec);
+//  REQUIRE(0 == ec.value());
+//  acceptor.listen(100, ec);
+//  REQUIRE(0 == ec.value());
+//
+//  auto lambda2 = [&](boost::asio::yield_context yield) {
+//    try {
+//      acceptor.async_accept(socket2, yield);
+//      boost::asio::async_read(socket2, boost::asio::buffer(r_buffer2), yield);
+//      boost::asio::async_write(socket2, boost::asio::buffer(buffer2), yield);
+//    } catch (const std::exception& e) {
+//      std::cout << e.what() << std::endl;
+//    }
+//  };
+//
+//  auto lambda1 = [&](boost::asio::yield_context yield) {
+//    try {
+//      socket1.async_connect(remote_endpoint, yield);
+//      boost::asio::async_write(socket1, boost::asio::buffer(buffer1), yield);
+//      boost::asio::async_read(socket1, boost::asio::buffer(r_buffer1), yield);
+//
+//      socket1.shutdown(boost::asio::socket_base::shutdown_both);
+//      socket1.close();
+//      REQUIRE_FALSE(socket1.is_open());
+//
+//      socket2.shutdown(boost::asio::socket_base::shutdown_both);
+//      socket2.close();
+//      REQUIRE_FALSE(socket2.is_open());
+//
+//      acceptor.close();
+//      REQUIRE_FALSE(acceptor.is_open());
+//    } catch (const std::exception& e) {
+//      std::cout << e.what() << std::endl;
+//    }
+//  };
+//
+//  boost::thread_group threads;
+//  boost::asio::spawn(io_context, lambda2);
+//  boost::asio::spawn(io_context, lambda1);
+//  for (uint16_t i = 1; i <= boost::thread::hardware_concurrency(); ++i) {
+//    threads.create_thread([&io_context]() { io_context.run(); });
+//  }
+//  threads.join_all();
+//}
 
 /// Test a stream protocol synchronous interface
 template <class StreamProtocol>
@@ -659,22 +659,24 @@ void TestStreamErrorConnectionProtocol(
 using udt_protocol = ip::udt<>;
 
 TEST_CASE("UDTTestMultipleConnections") {
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
-                                                   "9000");
-  udt_protocol::resolver::query client_local_udt_query("127.0.0.1", "8000");
-  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
-
   // TODO: fix compilation
+  //  udt_protocol::resolver::query
+  //  acceptor_udt_query(boost::asio::ip::udp::v4(),
+  //                                                   "9000");
+  //  udt_protocol::resolver::query client_local_udt_query("127.0.0.1", "8000");
+  //  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
+
   // TestMultipleConnections<udt_protocol>(client_local_udt_query,
   // client_udt_query, acceptor_udt_query, 200, 100);
 }
 
 TEST_CASE("UDTProtocolLightExchangeTest") {
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
-                                                   "9000");
-  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
-
   // TODO: fix compilation
+  //  udt_protocol::resolver::query
+  //  acceptor_udt_query(boost::asio::ip::udp::v4(),
+  //                                                   "9000");
+  //  udt_protocol::resolver::query client_udt_query("127.0.0.1", "9000");
+
   //  TestStreamProtocol<udt_protocol>(client_udt_query, acceptor_udt_query, 1);
   //  TestStreamProtocolFuture<udt_protocol>(client_udt_query,
   //  acceptor_udt_query);

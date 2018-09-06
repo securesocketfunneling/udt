@@ -14,9 +14,6 @@ TEST_CASE("UDTEnpoint") {
   endpoint_type ep2(ep1);
   endpoint_type ep3 = ep1;
 
-  typename endpoint_type::protocol_type protocol1;
-  (void)protocol1;
-
   endpoint_type();
 
   typename endpoint_type::protocol_type protocol2 = ep1.protocol();

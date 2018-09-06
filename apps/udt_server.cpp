@@ -32,17 +32,8 @@ int main(int argc, char* argv[]) {
   SocketPtr p_socket(std::make_shared<udt_protocol::socket>(io_context));
   udt_protocol::acceptor acceptor(io_context);
   udt_protocol::resolver resolver(io_context);
-
-  udt_protocol::resolver::query acceptor_udt_query(boost::asio::ip::udp::v4(),
-                                                   argv[1]);
-  auto acceptor_endpoint_it = resolver.resolve(acceptor_udt_query, resolve_ec);
-
-  if (resolve_ec) {
-    std::cerr << "Wrong argument provided\n";
-    return 1;
-  }
-
-  udt_protocol::endpoint acceptor_endpoint(*acceptor_endpoint_it);
+  udt_protocol::endpoint acceptor_endpoint{udt_protocol::v4(),
+                                           (unsigned short)std::stoul(argv[1])};
 
   AcceptHandler accepted;
   ReceiveHandler received_handler;
@@ -77,7 +68,7 @@ int main(int argc, char* argv[]) {
 
   boost::system::error_code ec;
 
-  acceptor.open();
+  acceptor.open(acceptor_endpoint.protocol());
   acceptor.bind(acceptor_endpoint, ec);
   acceptor.listen(100, ec);
 

@@ -31,6 +31,16 @@ class udt : public connected_protocol::Protocol<udt<>, boost::asio::ip::udp,
   /// Obtain an identifier for the protocol family.
   int family() const { return family_; }
 
+  /// Compare two protocols for equality.
+  friend bool operator==(const udt& p1, const udt& p2) {
+    return p1.family_ == p2.family_;
+  }
+
+  /// Compare two protocols for inequality.
+  friend bool operator!=(const udt& p1, const udt& p2) {
+    return p1.family_ != p2.family_;
+  }
+
  private:
   // Construct with a specific family.
   explicit udt(int protocol_family) : family_(protocol_family) {}

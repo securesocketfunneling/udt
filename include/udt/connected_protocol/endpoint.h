@@ -21,6 +21,13 @@ class Endpoint {
  public:
   Endpoint() : socket_id_(0), next_layer_endpoint_() {}
 
+  Endpoint(const TProtocol& protocol_type, unsigned short port_num)
+      : socket_id_{0},
+        next_layer_endpoint_{(protocol_type == TProtocol::v4())
+                                 ? NextLayer::v4()
+                                 : NextLayer::v6(),
+                             port_num} {}
+
   Endpoint(const boost::asio::ip::address& addr, unsigned short port_num)
       : socket_id_{0}, next_layer_endpoint_{addr, port_num} {}
 

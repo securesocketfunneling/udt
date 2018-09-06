@@ -32,16 +32,14 @@ int main(int argc, char* argv[]) {
   udt_protocol::socket socket(io_context);
   udt_protocol::resolver resolver(io_context);
 
-  udt_protocol::resolver::query client_udt_query(argv[1], argv[2]);
-
-  auto remote_endpoint_it = resolver.resolve(client_udt_query, resolve_ec);
+  auto resolve_results = resolver.resolve(argv[1], argv[2], resolve_ec);
 
   if (resolve_ec) {
     std::cerr << "Wrong arguments provided\n";
     return 1;
   }
 
-  udt_protocol::endpoint remote_endpoint(*remote_endpoint_it);
+  udt_protocol::endpoint remote_endpoint(resolve_results->endpoint());
 
   ConnectHandler connected;
   SendHandler sent_handler;
@@ -70,7 +68,7 @@ int main(int argc, char* argv[]) {
                              sent_handler);
   };
 
-  socket.async_connect(remote_endpoint, connected);
+  socket.async_connect(remote_endpoint, boost::bind(connected, _1));
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
