@@ -603,7 +603,6 @@ class ConnectedState : public BaseState<Protocol>,
       return;
     }
 
-    boost::system::error_code ec;
     congestion_control_.OnClose();
     auto self = this->shared_from_this();
     ShutdownDatagramPtr p_shutdown_dgr = std::make_shared<ShutdownDatagram>();

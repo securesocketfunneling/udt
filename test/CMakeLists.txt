@@ -9,7 +9,7 @@ target_sources(udt_tests
     protocol_tests.cpp
     stream_tests.cpp)
 
-target_link_libraries(udt_tests SecureSocketFunneling::UDT Catch2::Catch2)
+target_link_libraries(udt_tests AsioUDT::AsioUDT Catch2::Catch2)
 
 include(ParseAndAddCatchTests)
 ParseAndAddCatchTests(udt_tests)

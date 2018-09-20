@@ -120,6 +120,12 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
   boost::system::error_code set_option(implementation_type& impl,
                                        const SettableSocketOption& option,
                                        boost::system::error_code& ec) {
+
+    // Setting Socket-level option is skipped for UDT
+    if (option.level(protocol_type::v4()) == BOOST_ASIO_OS_DEF(SOL_SOCKET)) {
+      return ec;
+    }
+
     ec.assign(::common::error::function_not_supported,
               ::common::error::get_error_category());
     return ec;
