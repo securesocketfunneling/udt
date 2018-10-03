@@ -45,7 +45,7 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
       : boost::asio::detail::service_base<socket_acceptor_service>(io_context) {
   }
 
-  virtual ~socket_acceptor_service() {}
+  virtual ~socket_acceptor_service() = default;
 
   void construct(implementation_type& impl) {
     impl.p_multiplexer.reset();
@@ -196,36 +196,53 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
     return ec;
   }
 
+  typename Protocol::socket accept(implementation_type& impl, boost::asio::io_context* peer_io_context, endpoint_type* peer_endpoint,
+                                     boost::system::error_code& ec) {
+      typename Protocol::socket peer(peer_io_context ? *peer_io_context : this->get_io_context());
+      try {
+          ec.clear();
+          auto future_value = async_accept(impl, peer, peer_endpoint, boost::asio::use_future);
+          future_value.get();
+          ec.assign(::common::error::success,
+                    ::common::error::get_error_category());
+      } catch (const std::system_error& e) {
+          ec.assign(e.code().value(), ::common::error::get_error_category());
+      }
+      return peer;
+    }
+
   template <typename Protocol1, typename SocketService, typename AcceptHandler>
   BOOST_ASIO_INITFN_RESULT_TYPE(AcceptHandler, void(boost::system::error_code))
   async_accept(implementation_type& impl,
                boost::asio::basic_socket<Protocol1, SocketService>& peer,
                endpoint_type* p_peer_endpoint,
-               BOOST_ASIO_MOVE_ARG(AcceptHandler) handler,
+               BOOST_ASIO_MOVE_ARG(AcceptHandler) token,
                typename std::enable_if<boost::thread_detail::is_convertible<
                    protocol_type, Protocol1>::value>::type* = 0) {
     boost::asio::async_completion<AcceptHandler,
                                   void(boost::system::error_code)>
-        init(handler);
+        completion(token);
+
+    auto & handler = completion.completion_handler;
 
     if (!is_open(impl)) {
       this->get_io_context().post(
-          boost::asio::detail::binder1<AcceptHandler,
+          boost::asio::detail::binder1<decltype(handler),
                                        boost::system::error_code>(
-              handler, boost::system::error_code(
+              token, boost::system::error_code(
                            ::common::error::broken_pipe,
                            ::common::error::get_error_category())));
-      return init.result.get();
+      return completion.result.get();
     }
 
     if (!impl.p_multiplexer) {
       this->get_io_context().post(
-          boost::asio::detail::binder1<AcceptHandler,
+          boost::asio::detail::binder1<decltype(handler),
                                        boost::system::error_code>(
-              handler, boost::system::error_code(
+              token, boost::system::error_code(
                            ::common::error::bad_address,
                            ::common::error::get_error_category())));
-      return init.result.get();
+      return completion.result.get();
     }
 
     typedef io::pending_accept_operation<AcceptHandler, protocol_type>
@@ -240,7 +257,7 @@ class socket_acceptor_service : public boost::asio::detail::service_base<
 
     p.v = p.p = 0;
 
-    return init.result.get();
+    return completion.result.get();
   }
 
   /// Start an asynchronous accept.

@@ -8,7 +8,7 @@
 #include "../connected_protocol/logger/no_log.h"
 #include "../connected_protocol/protocol.h"
 
-#define IPPROTO_UDT		133		/* SCTP+1 */
+#define IPPROTO_UDT		IPPROTO_IP		/* SCTP+1 */
 
 namespace ip {
 

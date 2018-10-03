@@ -12,6 +12,7 @@
 #include <boost/asio/detail/socket_types.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/basic_resolver.hpp>
+#include <boost/asio/ip/basic_endpoint.hpp>
 
 #include <chrono>
 
@@ -74,6 +75,11 @@ class Protocol {
       boost::asio::detail::socket_option::integer<BOOST_ASIO_OS_DEF(SOL_SOCKET),
                                                   TIMEOUT_DELAY>;
 
+  using endpoint = Endpoint<Proto>;
+
+  using resolver = boost::asio::ip::basic_resolver<Proto>;
+//  using resolver = Resolver<Protocol>;
+
   using multiplexer_manager = MultiplexerManager<Protocol>;
   using multiplexer = Multiplexer<Protocol>;
   using flow = Flow<Protocol>;
@@ -81,10 +87,6 @@ class Protocol {
   using congestion_control = CongestionControlAlg<Protocol>;
 
   using logger = Logger;
-
-  using resolver = boost::asio::ip::basic_resolver<Proto>;
-
-  using endpoint = Endpoint<Proto>;
 
   using socket = boost::asio::basic_stream_socket<
       Proto, connected_protocol::stream_socket_service<Proto>>;
