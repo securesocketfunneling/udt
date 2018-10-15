@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
                              sent_handler);
   };
 
-  socket.async_connect(remote_endpoint, boost::bind(connected, _1));
+  socket.async_connect(remote_endpoint, boost::bind(connected, boost::placeholders::_1));
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {

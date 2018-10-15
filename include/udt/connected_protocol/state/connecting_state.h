@@ -182,7 +182,7 @@ class ConnectingState
         *p_connection_dgr, ConnectionDatagram::Header::CONNECTION,
         ConnectionDatagram::Header::NO_ADDITIONAL_INFO,
         boost::bind(&ConnectingState::SendLoopConnectionDgr,
-                    this->shared_from_this(), p_connection_dgr, _1, _2));
+                    this->shared_from_this(), p_connection_dgr, boost::placeholders::_1, boost::placeholders::_2));
   }
 
   void SendLoopConnectionDgr(
@@ -221,7 +221,7 @@ class ConnectingState
               *p_connection_dgr, ConnectionDatagram::Header::CONNECTION,
               ConnectionDatagram::Header::NO_ADDITIONAL_INFO,
               boost::bind(&ConnectingState::SendLoopConnectionDgr, self,
-                          p_connection_dgr, _1, _2));
+                          p_connection_dgr, boost::placeholders::_1, boost::placeholders::_2));
         });
   }
 
@@ -235,7 +235,8 @@ class ConnectingState
         std::chrono::seconds(p_session->timeout_delay()));
 
     timeout_timer_.async_wait(boost::bind(&ConnectingState::HandleTimeoutTimer,
-                                          this->shared_from_this(), _1));
+                                          this->shared_from_this(),
+                                          boost::placeholders::_1));
   }
 
   void HandleTimeoutTimer(const boost::system::error_code& ec) {

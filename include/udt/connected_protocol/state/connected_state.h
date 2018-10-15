@@ -86,16 +86,16 @@ class ConnectedState : public BaseState<Protocol>,
 
     ack_timer_.expires_from_now(p_session->connection_info().ack_period());
     ack_timer_.async_wait(boost::bind(&ConnectedState::AckTimerHandler,
-                                      this->shared_from_this(), _1, false));
+                                      this->shared_from_this(), boost::placeholders::_1, false));
     exp_timer_.expires_from_now(p_session->connection_info().exp_period());
     exp_timer_.async_wait(boost::bind(&ConnectedState::ExpTimerHandler,
-                                      this->shared_from_this(), _1));
+                                      this->shared_from_this(), boost::placeholders::_1));
 
     /* Nack not send periodically anymore
     receiver_.nack_timer.expires_from_now(
         p_session_->connection_info.nack_period());
     receiver_.nack_timer.async_wait(boost::bind(
-        &ConnectedState::NAckTimerHandler, this->shared_from_this(), _1));*/
+        &ConnectedState::NAckTimerHandler, this->shared_from_this(), boost::placeholders::_1));*/
   }
 
   virtual void Stop() {
@@ -350,7 +350,7 @@ class ConnectedState : public BaseState<Protocol>,
     }
     ack_timer_.expires_from_now(p_session->connection_info().ack_period());
     ack_timer_.async_wait(boost::bind(&ConnectedState::AckTimerHandler,
-                                      this->shared_from_this(), _1, false));
+                                      this->shared_from_this(), boost::placeholders::_1, false));
   }
 
   virtual void Log(connected_protocol::logger::LogEntry* p_log) {
@@ -392,7 +392,7 @@ class ConnectedState : public BaseState<Protocol>,
     }
     nack_timer_.expires_from_now(p_session->connection_info.nack_period());
     nack_timer_.async_wait(boost::bind(&ConnectedState::NAckTimerHandler,
-                                       this->shared_from_this(), _1));
+                                       this->shared_from_this(), boost::placeholders::_1));
   }
 
   /// Reset expiration
@@ -420,7 +420,7 @@ class ConnectedState : public BaseState<Protocol>,
 
     exp_timer_.expires_from_now(p_session->connection_info().exp_period());
     exp_timer_.async_wait(boost::bind(&ConnectedState::ExpTimerHandler,
-                                      this->shared_from_this(), _1));
+                                      this->shared_from_this(), boost::placeholders::_1));
   }
 
   void ExpTimerHandler(const boost::system::error_code& ec) {

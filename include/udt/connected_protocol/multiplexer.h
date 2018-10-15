@@ -259,7 +259,7 @@ class Multiplexer : public std::enable_shared_from_this<Multiplexer<Protocol>> {
       socket_.async_receive_from(
           p_generic_packet->GetMutableBuffers(), *p_next_remote_endpoint,
           boost::bind(&Multiplexer::HandlePacket, this->shared_from_this(),
-                      p_generic_packet, p_next_remote_endpoint, _1, _2));
+                      p_generic_packet, p_next_remote_endpoint, boost::placeholders::_1, boost::placeholders::_2));
     }
   }
 

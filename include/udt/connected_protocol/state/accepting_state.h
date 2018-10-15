@@ -144,7 +144,7 @@ class AcceptingState
         std::chrono::seconds(p_session->timeout_delay()));
 
     timeout_timer_.async_wait(boost::bind(&AcceptingState::HandleTimeoutTimer,
-                                          this->shared_from_this(), _1));
+                                          this->shared_from_this(), boost::placeholders::_1));
   }
 
   void HandleTimeoutTimer(const boost::system::error_code& ec) {

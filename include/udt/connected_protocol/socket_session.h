@@ -333,7 +333,8 @@ class SocketSession
       logger_timer_.expires_from_now(
           std::chrono::milliseconds(Logger::FREQUENCY));
       logger_timer_.async_wait(boost::bind(&SocketSession::LoggerTimerHandler,
-                                           this->shared_from_this(), _1));
+                                           this->shared_from_this(),
+                                           boost::placeholders::_1));
     }
   }
 

@@ -141,7 +141,7 @@ class Flow : public std::enable_shared_from_this<Flow<Protocol>> {
 
       next_packet_timer_.expires_from_now(next_scheduled_packet_interval);
       next_packet_timer_.async_wait(boost::bind(&Flow::WaitPullSocketHandler,
-                                                this->shared_from_this(), _1));
+                                                this->shared_from_this(), boost::placeholders::_1));
     }
   }
 

@@ -355,7 +355,7 @@ class Sender {
 
   void UnqueueWriteOp() {
     write_ops_queue_.async_get(
-        boost::bind(&Sender::ProcessWriteOp, this, _1, _2));
+        boost::bind(&Sender::ProcessWriteOp, this, boost::placeholders::_1, boost::placeholders::_2));
   }
 
   void ProcessWriteOp(const boost::system::error_code& ec,

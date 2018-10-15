@@ -47,11 +47,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Accepted\n";
     boost::asio::async_read(*p_socket, boost::asio::buffer(r_buffer2),
-                            boost::bind(received_handler, _1, _2, p_socket));
+                            boost::bind(received_handler, boost::placeholders::_1, boost::placeholders::_2, p_socket));
 
     SocketPtr p_new_socket(std::make_shared<udt_protocol::socket>(io_context));
     acceptor.async_accept(*p_new_socket,
-                          boost::bind(accepted, _1, p_new_socket));
+                          boost::bind(accepted, boost::placeholders::_1, p_new_socket));
   };
 
   received_handler = [&](const boost::system::error_code& ec,
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Received : " << length << "\n";
     boost::asio::async_read(*p_socket, boost::asio::buffer(r_buffer2),
-                            boost::bind(received_handler, _1, _2, p_socket));
+                            boost::bind(received_handler, boost::placeholders::_1, boost::placeholders::_2, p_socket));
   };
 
   boost::system::error_code ec;
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
   acceptor.bind(acceptor_endpoint, ec);
   acceptor.listen(100, ec);
 
-  acceptor.async_accept(*p_socket, boost::bind(accepted, _1, p_socket));
+  acceptor.async_accept(*p_socket, boost::bind(accepted, boost::placeholders::_1, p_socket));
 
   std::vector<std::shared_ptr<std::thread>> threads;
   for (uint16_t i = 1; i <= std::thread::hardware_concurrency(); ++i) {
