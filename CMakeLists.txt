@@ -23,7 +23,15 @@ target_link_libraries(asio_udt INTERFACE Boost::boost Threads::Threads)
 target_include_directories(asio_udt INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_include_directories(asio_udt SYSTEM INTERFACE $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>)
 file(GLOB_RECURSE ASIO_UDT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/udt/*.h")
-target_sources(asio_udt INTERFACE $<BUILD_INTERFACE:${ASIO_UDT_HEADERS}>)
+
+#
+#  HACK: to have the files showing in the IDE
+#
+if (XCODE OR MSVC)
+  add_custom_target(asio_udt_sources SOURCES
+      ${ASIO_UDT_HEADERS})
+  set_target_properties(asio_udt_sources PROPERTIES FOLDER 3rdparty)
+endif ()
 
 if (ASIO_UDT_BUILD_APPS)
   add_subdirectory(apps)
